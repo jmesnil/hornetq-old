@@ -1,0 +1,10 @@
+doc
+pkg
+.settings
+bin
+data
+build
+eclipse-output
+native
+target
+thirdparty
