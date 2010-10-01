@@ -1,0 +1,39 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, Verdana, Arial, sans-serif;
+  padding: 10px;
+}
+
+#disconnect {
+  display: none;
+}
+
+#geo-wrapper {
+   width:300px;
+   height:280px;
+}
+
+#debug {
+  background-color: #F0F0F0;
+  font-size: 12px;
+  overflow: auto;
+  padding: 10px;
+  z-index: 100;
+}
+
+form dt {
+   clear:both;
+   width:19%;
+   float:left;
+   text-align:right;
+}
+
+form dd {
+   float:left;
+   width:80%;
+   margin:0 0 0.5em 0.25em;
+}

@@ -1,0 +1,5 @@
+<configuration xmlns="urn:hornetq" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:hornetq /schema/hornetq-jms.xsd">
+   <topic name="trackers">
+      <entry name="/topic/trackers" />
+   </topic>
+</configuration>
