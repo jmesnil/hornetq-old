@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Tracker Monitor</title>
+    <link rel="stylesheet" href="s/monitor.css" />
+    <script src='http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js'></script>
+    <script src='j/stomp.js'></script>
+    <script src='j/monitor.js'></script>
+    <script>
+    $(document).ready(function() {
+      var supported = ("WebSocket" in window);
+      if(!supported) {
+        var msg = "Your browser does not support Web Sockets. This example will not work properly.<br>";
+        msg += "Please use a Web Browser with Web Sockets support (WebKit or Google Chrome).";
+        $("#connect").html(msg);
+      }
+    });
+    </script>
+  </head>
+  <body>
+    <div id='connect'>
+      <form id='connect_form'>
+         <dl>
+           <dd><input type=submit id='connect_submit' value="Connect"></dd>
+        </dl>
+      </form>
+    </div>
+    <div id="disconnect">
+      <form id='disconnect_form'>
+        <input type=submit id='disconnect_submit' value="Disconnect">
+      </form>
+    </div>
+    
+    <pre id="debug"></pre>
+    
+    <p id=geo-wrapper></p>
+
+    <script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script>
+  </body>
+</html>
+
