@@ -207,27 +207,14 @@ public class PagingManagerImpl implements PagingManager
       pagingStoreFactory.stop();
    }
 
-   public void resumeDepages()
+   public void processReload() throws Exception
    {
-      if (!started)
+      for (PagingStore store: stores.values())
       {
-         // If stop the server while depaging, the server may call a rollback,
-         // the rollback may addSizes back and that would fire a globalDepage.
-         // Because of that we must ignore any startGlobalDepage calls,
-         // and this check needs to be done outside of the lock
-         return;
-      }
-      synchronized (this)
-      {
-         for (PagingStore store : stores.values())
-         {
-            if (store.isPaging())
-            {
-               store.startDepaging();
-            }
-         }
+         store.processReload();
       }
    }
+
 
    // Package protected ---------------------------------------------
 
@@ -235,7 +222,7 @@ public class PagingManagerImpl implements PagingManager
 
    // Private -------------------------------------------------------
 
-   protected PagingStore newStore(final SimpleString address) throws Exception
+   protected PagingStore newStore(final SimpleString address) 
    {
       return pagingStoreFactory.newStore(address,
                                          addressSettingsRepository.getMatch(address.toString()));

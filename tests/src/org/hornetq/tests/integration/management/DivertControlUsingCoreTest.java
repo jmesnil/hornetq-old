@@ -17,10 +17,12 @@ import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.api.core.management.DivertControl;
 import org.hornetq.api.core.management.ResourceNames;
 import org.hornetq.core.client.impl.ClientSessionFactoryImpl;
 import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
+import org.hornetq.tests.util.UnitTestCase;
 
 /**
  * A DivertControlUsingCoreTest
@@ -37,6 +39,7 @@ public class DivertControlUsingCoreTest extends DivertControlTest
    // Attributes ----------------------------------------------------
 
    private ClientSession session;
+   private ServerLocator locator;
 
    // Static --------------------------------------------------------
 
@@ -47,7 +50,7 @@ public class DivertControlUsingCoreTest extends DivertControlTest
    @Override
    protected DivertControl createManagementControl(final String name) throws Exception
    {
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      ClientSessionFactory sf = locator.createSessionFactory();
       session = sf.createSession(false, true, true);
       session.start();
 
@@ -99,12 +102,26 @@ public class DivertControlUsingCoreTest extends DivertControlTest
 
    // Protected -----------------------------------------------------
 
+
+   @Override
+   protected void setUp() throws Exception
+   {
+      super.setUp();
+
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+   }
+
    @Override
    protected void tearDown() throws Exception
    {
       if (session != null)
       {
          session.close();
+      }
+
+      if(locator != null)
+      {
+         locator.close();
       }
 
       super.tearDown();

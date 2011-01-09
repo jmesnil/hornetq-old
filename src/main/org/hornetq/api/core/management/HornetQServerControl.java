@@ -26,11 +26,11 @@ public interface HornetQServerControl
    // Attributes ----------------------------------------------------
 
    /**
-    * Returns the name of the connector used to connect to the backup.
+    * Returns the name of the connector used to connect to the live.
     * <br>
-    * If this server has no backup or is itself a backup, the value is {@code null}.
+    * If this server is not a backup that uses shared nothing HA, it's value is null
     */
-   String getBackupConnectorName();
+   String getLiveConnectorName() throws Exception;
 
    /**
     * Returns this server's version.
@@ -411,6 +411,20 @@ public interface HornetQServerControl
    String[] listPreparedTransactions() throws Exception;
 
    /**
+    * List all the prepared transaction, sorted by date,
+    * oldest first, with details, in text format.
+    */
+   @Operation(desc = "List all the prepared transaction, sorted by date, oldest first, with details, in JSON format")
+   String listPreparedTransactionDetailsAsJSON() throws Exception;
+
+   /**
+    * List all the prepared transaction, sorted by date,
+    * oldest first, with details, in HTML format
+    */
+   @Operation(desc = "List all the prepared transaction, sorted by date, oldest first, with details, in HTML format")
+   String listPreparedTransactionDetailsAsHTML() throws Exception;
+
+   /**
     * List transactions which have been heuristically committed.
     */
    String[] listHeuristicCommittedTransactions() throws Exception;
@@ -465,6 +479,8 @@ public interface HornetQServerControl
     */
    @Operation(desc = "List all the connection IDs", impact = MBeanOperationInfo.INFO)
    String[] listConnectionIDs() throws Exception;
+   
+   String listProducersInfoAsJSON() throws Exception;
 
    /**
     * Lists all the sessions IDs for the specified connection ID.
@@ -537,7 +553,7 @@ public interface HornetQServerControl
 
    String[] getBridgeNames();
    
-   @Operation(desc= "Create a Bridge using a pair of connectors", impact = MBeanOperationInfo.ACTION)
+   @Operation(desc= "Create a Bridge", impact = MBeanOperationInfo.ACTION)
    void createBridge(@Parameter(name="name", desc="Name of the bridge") String name,
                      @Parameter(name="queueName", desc="Name of the source queue") String queueName,
                      @Parameter(name="forwardingAddress", desc="Forwarding address") String forwardingAddress,
@@ -546,32 +562,19 @@ public interface HornetQServerControl
                      @Parameter(name="retryInterval", desc="Connection retry interval") long retryInterval,
                      @Parameter(name="retryIntervalMultiplier", desc="Connection retry interval multiplier") double retryIntervalMultiplier,
                      @Parameter(name="reconnectAttempts", desc="Number of reconnection attempts") int reconnectAttempts,
-                     @Parameter(name="failoverOnServerShutdown", desc="Failover when the server shuts down?") boolean failoverOnServerShutdown,
                      @Parameter(name="useDuplicateDetection", desc="Use duplicate detection") boolean useDuplicateDetection,
                      @Parameter(name="confirmationWindowSize", desc="Confirmation window size") int confirmationWindowSize,
                      @Parameter(name="clientFailureCheckPeriod", desc="Period to check client failure") long clientFailureCheckPeriod,
-                     @Parameter(name="liveConnector", desc="Name of the connector to the live server") String liveConnector,
-                     @Parameter(name="backupConnector", desc="Name of the connector to the backup server") String backupConnector,
+                     @Parameter(name="staticConnectorNames", desc="comma separated list of connector names or name of discovery group if 'useDiscoveryGroup' is set to true") String connectorNames,
+                     @Parameter(name="useDiscoveryGroup", desc="use discovery  group")boolean useDiscoveryGroup,
+                     @Parameter(name="ha", desc="Is it using HA") boolean ha,
                      @Parameter(name="user", desc="User name") String user,
                      @Parameter(name="password", desc="User password") String password) throws Exception;
 
-   @Operation(desc= "Create a Bridge using a discovery group", impact = MBeanOperationInfo.ACTION)
-   void createBridge(@Parameter(name="name", desc="Name of the bridge") String name,
-                     @Parameter(name="queueName", desc="Name of the source queue") String queueName,
-                     @Parameter(name="forwardingAddress", desc="Forwarding address") String forwardingAddress,
-                     @Parameter(name="filterString", desc="Filter of the brdige") String filterString,
-                     @Parameter(name="transformerClassName", desc="Class name of the bridge transformer") String transformerClassName,
-                     @Parameter(name="retryInterval", desc="Connection retry interval") long retryInterval,
-                     @Parameter(name="retryIntervalMultiplier", desc="Connection retry interval multiplier") double retryIntervalMultiplier,
-                     @Parameter(name="reconnectAttempts", desc="Number of reconnection attempts") int reconnectAttempts,
-                     @Parameter(name="failoverOnServerShutdown", desc="Failover when the server shuts down?") boolean failoverOnServerShutdown,
-                     @Parameter(name="useDuplicateDetection", desc="Use duplicate detection") boolean useDuplicateDetection,
-                     @Parameter(name="confirmationWindowSize", desc="Confirmation window size") int confirmationWindowSize,
-                     @Parameter(name="clientFailureCheckPeriod", desc="Period to check client failure") long clientFailureCheckPeriod,
-                     @Parameter(name="name", desc="Name of the discovery group") String discoveryGroupName,
-                     @Parameter(name="user", desc="User name") String user,
-                     @Parameter(name="password", desc="User password") String password) throws Exception;
 
    @Operation(desc= "Destroy a bridge", impact = MBeanOperationInfo.ACTION)
    void destroyBridge(@Parameter(name="name", desc="Name of the bridge") String name) throws Exception;
+
+   @Operation(desc = "force the server to stop and notify clients to failover", impact = MBeanOperationInfo.UNKNOWN)
+   void forceFailover() throws Exception;
 }

@@ -21,10 +21,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.TransportConfiguration;
-import org.hornetq.core.config.*;
+import org.hornetq.core.config.BridgeConfiguration;
+import org.hornetq.core.config.BroadcastGroupConfiguration;
+import org.hornetq.core.config.ClusterConnectionConfiguration;
+import org.hornetq.core.config.Configuration;
 import org.hornetq.core.config.ConnectorServiceConfiguration;
+import org.hornetq.core.config.CoreQueueConfiguration;
+import org.hornetq.core.config.DivertConfiguration;
 import org.hornetq.core.logging.impl.JULLogDelegateFactory;
 import org.hornetq.core.security.Role;
 import org.hornetq.core.server.JournalType;
@@ -46,6 +52,8 @@ public class ConfigurationImpl implements Configuration
    public static final boolean DEFAULT_PERSIST_DELIVERY_COUNT_BEFORE_DELIVERY = false;
 
    public static final boolean DEFAULT_BACKUP = false;
+
+   public static final boolean DEFAULT_ALLOW_AUTO_FAILBACK = true;
 
    public static final boolean DEFAULT_SHARED_STORE = false;
 
@@ -166,6 +174,8 @@ public class ConfigurationImpl implements Configuration
 
    public static final long DEFAULT_SERVER_DUMP_INTERVAL = -1;
 
+   private static final boolean DEFAULT_FAILOVER_ON_SERVER_SHUTDOWN = false;
+
    public static final int DEFAULT_MEMORY_WARNING_THRESHOLD = 25;
 
    public static final long DEFAULT_MEMORY_MEASURE_INTERVAL = -1; // in milliseconds
@@ -173,10 +183,14 @@ public class ConfigurationImpl implements Configuration
    public static final String DEFAULT_LOG_DELEGATE_FACTORY_CLASS_NAME = JULLogDelegateFactory.class.getCanonicalName();
 
    // Attributes -----------------------------------------------------------------------------
+   
+   protected String name = "ConfigurationImpl::" + System.identityHashCode(this);
 
    protected boolean clustered = ConfigurationImpl.DEFAULT_CLUSTERED;
 
    protected boolean backup = ConfigurationImpl.DEFAULT_BACKUP;
+
+   protected boolean allowAutoFailBack = ConfigurationImpl.DEFAULT_ALLOW_AUTO_FAILBACK;
 
    protected boolean sharedStore = ConfigurationImpl.DEFAULT_SHARED_STORE;
 
@@ -220,7 +234,7 @@ public class ConfigurationImpl implements Configuration
 
    protected Set<TransportConfiguration> acceptorConfigs = new HashSet<TransportConfiguration>();
 
-   protected String backupConnectorName;
+   protected String liveConnectorName;
 
    protected List<BridgeConfiguration> bridgeConfigurations = new ArrayList<BridgeConfiguration>();
 
@@ -306,6 +320,8 @@ public class ConfigurationImpl implements Configuration
 
    protected long serverDumpInterval = ConfigurationImpl.DEFAULT_SERVER_DUMP_INTERVAL;
 
+   protected boolean failoverOnServerShutdown = ConfigurationImpl.DEFAULT_FAILOVER_ON_SERVER_SHUTDOWN;
+
    // percentage of free memory which triggers warning from the memory manager
    protected int memoryWarningThreshold = ConfigurationImpl.DEFAULT_MEMORY_WARNING_THRESHOLD;
 
@@ -329,6 +345,16 @@ public class ConfigurationImpl implements Configuration
    public void setClustered(final boolean clustered)
    {
       this.clustered = clustered;
+   }
+
+   public boolean isAllowAutoFailBack()
+   {
+      return allowAutoFailBack;
+   }
+
+   public void setAllowAutoFailBack(boolean allowAutoFailBack)
+   {
+      this.allowAutoFailBack = allowAutoFailBack;
    }
 
    public boolean isBackup()
@@ -474,14 +500,14 @@ public class ConfigurationImpl implements Configuration
       connectorConfigs = infos;
    }
 
-   public String getBackupConnectorName()
+   public String getLiveConnectorName()
    {
-      return backupConnectorName;
+      return liveConnectorName;
    }
 
-   public void setBackupConnectorName(final String backupConnectorName)
+   public void setLiveConnectorName(final String liveConnectorName)
    {
-      this.backupConnectorName = backupConnectorName;
+      this.liveConnectorName = liveConnectorName;
    }
    
    public GroupingHandlerConfiguration getGroupingHandlerConfiguration()
@@ -859,6 +885,16 @@ public class ConfigurationImpl implements Configuration
       return clusterPassword;
    }
 
+   public boolean isFailoverOnServerShutdown()
+   {
+      return failoverOnServerShutdown;
+   }
+
+   public void setFailoverOnServerShutdown(boolean failoverOnServerShutdown)
+   {
+      this.failoverOnServerShutdown = failoverOnServerShutdown;
+   }
+
    public void setClusterPassword(final String theclusterPassword)
    {
       clusterPassword = theclusterPassword;
@@ -1012,14 +1048,14 @@ public class ConfigurationImpl implements Configuration
       {
          return false;
       }
-      if (backupConnectorName == null)
+      if (liveConnectorName == null)
       {
-         if (other.backupConnectorName != null)
+         if (other.liveConnectorName != null)
          {
             return false;
          }
       }
-      else if (!backupConnectorName.equals(other.backupConnectorName))
+      else if (!liveConnectorName.equals(other.liveConnectorName))
       {
          return false;
       }
@@ -1166,6 +1202,10 @@ public class ConfigurationImpl implements Configuration
          }
       }
       else if (!managementAddress.equals(other.managementAddress))
+      {
+         return false;
+      }
+      if (failoverOnServerShutdown != other.isFailoverOnServerShutdown())
       {
          return false;
       }
@@ -1323,4 +1363,34 @@ public class ConfigurationImpl implements Configuration
       this.connectorServiceConfigurations = configs;
    }
 
+   /* (non-Javadoc)
+    * @see org.hornetq.core.config.Configuration#getName()
+    */
+   public String getName()
+   {
+      return name;
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.config.Configuration#setName(java.lang.String)
+    */
+   public void setName(String name)
+   {
+      this.name = name;
+   }
+
+   @Override
+   public String toString()
+   {
+      StringBuffer sb = new StringBuffer("HornetQ Configuration (");
+      sb.append("clustered=").append(clustered).append(",");
+      sb.append("backup=").append(backup).append(",");
+      sb.append("sharedStore=").append(sharedStore).append(",");
+      sb.append("journalDirectory=").append(journalDirectory).append(",");
+      sb.append("bindingsDirectory=").append(bindingsDirectory).append(",");
+      sb.append("largeMessagesDirectory=").append(largeMessagesDirectory).append(",");
+      sb.append("pagingDirectory=").append(pagingDirectory);
+      sb.append(")");
+      return sb.toString();
+   }
 }

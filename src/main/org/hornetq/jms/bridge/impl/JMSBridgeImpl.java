@@ -969,7 +969,7 @@ public class JMSBridgeImpl implements HornetQComponent, JMSBridge
    {
       Connection conn;
 
-      ConnectionFactory cf = cff.createConnectionFactory();
+      Object cf = cff.createConnectionFactory();
 
       if (qualityOfServiceMode == QualityOfServiceMode.ONCE_AND_ONLY_ONCE && !(cf instanceof XAConnectionFactory))
       {
@@ -992,7 +992,7 @@ public class JMSBridgeImpl implements HornetQComponent, JMSBridge
             {
                JMSBridgeImpl.log.trace("Creating a non XA connection");
             }
-            conn = cf.createConnection();
+            conn = ((ConnectionFactory)cf).createConnection();
          }
       }
       else
@@ -1011,7 +1011,7 @@ public class JMSBridgeImpl implements HornetQComponent, JMSBridge
             {
                JMSBridgeImpl.log.trace("Creating a non XA connection");
             }
-            conn = cf.createConnection(username, password);
+            conn = ((ConnectionFactory)cf).createConnection(username, password);
          }
       }
 
@@ -1730,6 +1730,13 @@ public class JMSBridgeImpl implements HornetQComponent, JMSBridge
                try
                {
                   msg = sourceConsumer.receive(1000);
+                  
+                  if (msg instanceof HornetQMessage)
+                  {
+                     // We need to check the buffer mainly in the case of LargeMessages
+                     // As we need to reconstruct the buffer before resending the message
+                     ((HornetQMessage)msg).checkBuffer();
+                  }
                }
                catch (JMSException jmse)
                {

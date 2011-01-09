@@ -16,8 +16,10 @@ package org.hornetq.jms;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -29,10 +31,11 @@ import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientMessage;
 import org.hornetq.api.core.client.ClientRequestor;
 import org.hornetq.api.core.client.ClientSession;
+import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.api.core.management.ManagementHelper;
 import org.hornetq.api.core.management.ResourceNames;
-import org.hornetq.core.client.impl.ClientSessionFactoryImpl;
 import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.remoting.impl.netty.NettyConnectorFactory;
 import org.hornetq.tests.util.SpawnedVMSupport;
@@ -55,6 +58,10 @@ public class HornetQAdmin implements Admin
 
    private Process serverProcess;
 
+   private ClientSessionFactory sf;
+   
+   ServerLocator serverLocator;
+
    public HornetQAdmin()
    {
       try
@@ -73,7 +80,8 @@ public class HornetQAdmin implements Admin
 
    public void start() throws Exception
    {
-      ClientSessionFactoryImpl sf = (ClientSessionFactoryImpl) HornetQClient.createClientSessionFactory(new TransportConfiguration(NettyConnectorFactory.class.getName()));
+      serverLocator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(NettyConnectorFactory.class.getName()));
+      sf = serverLocator.createSessionFactory();
       clientSession = sf.createSession(ConfigurationImpl.DEFAULT_CLUSTER_USER,
                                        ConfigurationImpl.DEFAULT_CLUSTER_PASSWORD,
                                        false,
@@ -88,18 +96,38 @@ public class HornetQAdmin implements Admin
    public void stop() throws Exception
    {
       requestor.close();
+      
+      if (sf != null)
+      {
+         sf.close();
+      }
+      
+      if (serverLocator != null)
+      {
+         serverLocator.close();
+      }
+      
+      sf = null;
+      serverLocator = null;
    }
 
    public void createConnectionFactory(final String name)
+   {
+      createConnection(name, 0);
+   }
+   
+   private void createConnection(final String name, final int cfType)
    {
       try
       {
          invokeSyncOperation(ResourceNames.JMS_SERVER,
                              "createConnectionFactory",
                              name,
-                             NettyConnectorFactory.class.getName(),
-                             new HashMap<String, Object>(),
-                             new String[] { name });
+                             false,
+                             false,
+                             cfType,
+                             "netty",
+                             name);
       }
       catch (Exception e)
       {
@@ -129,7 +157,7 @@ public class HornetQAdmin implements Admin
 
    public void createQueueConnectionFactory(final String name)
    {
-      createConnectionFactory(name);
+      createConnection(name, 1);
    }
 
    public void createTopic(final String name)
@@ -148,7 +176,7 @@ public class HornetQAdmin implements Admin
 
    public void createTopicConnectionFactory(final String name)
    {
-      createConnectionFactory(name);
+      createConnection(name, 2);
    }
 
    public void deleteConnectionFactory(final String name)

@@ -15,6 +15,7 @@ package org.hornetq.tests.unit.core.postoffice.impl;
 
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -86,7 +87,7 @@ public class BindingsImplTest extends UnitTestCase
    {
       final FakeBinding fake = new FakeBinding(new SimpleString("a"));
 
-      final BindingsImpl bind = new BindingsImpl(null);
+      final BindingsImpl bind = new BindingsImpl(null, null);
       bind.addBinding(fake);
       bind.addBinding(new FakeBinding(new SimpleString("a")));
       bind.addBinding(new FakeBinding(new SimpleString("a")));
@@ -346,6 +347,14 @@ public class BindingsImplTest extends UnitTestCase
       {
          // TODO Auto-generated method stub
          return false;
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.transaction.Transaction#getAllOperations()
+       */
+      public List<TransactionOperation> getAllOperations()
+      {
+         return null;
       }
 
    }
@@ -963,6 +972,42 @@ public class BindingsImplTest extends UnitTestCase
       {
          // TODO Auto-generated method stub
          
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.message.impl.MessageInternal#isServerMessage()
+       */
+      public boolean isServerMessage()
+      {
+         // TODO Auto-generated method stub
+         return false;
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.message.impl.MessageInternal#getTypedProperties()
+       */
+      public TypedProperties getTypedProperties()
+      {
+         // TODO Auto-generated method stub
+         return null;
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.server.ServerMessage#getDuplicateIDBytes()
+       */
+      public byte[] getDuplicateIDBytes()
+      {
+         // TODO Auto-generated method stub
+         return null;
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.server.ServerMessage#getDuplicateProperty()
+       */
+      public Object getDuplicateProperty()
+      {
+         // TODO Auto-generated method stub
+         return null;
       }
 
    }

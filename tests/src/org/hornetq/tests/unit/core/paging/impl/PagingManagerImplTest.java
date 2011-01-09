@@ -28,6 +28,7 @@ import org.hornetq.core.paging.impl.PagingStoreFactoryNIO;
 import org.hornetq.core.paging.impl.TestSupportPageStore;
 import org.hornetq.core.persistence.impl.nullpm.NullStorageManager;
 import org.hornetq.core.server.ServerMessage;
+import org.hornetq.core.server.impl.RoutingContextImpl;
 import org.hornetq.core.server.impl.ServerMessageImpl;
 import org.hornetq.core.settings.HierarchicalRepository;
 import org.hornetq.core.settings.impl.AddressFullMessagePolicy;
@@ -66,6 +67,7 @@ public class PagingManagerImplTest extends UnitTestCase
       
       
       PagingStoreFactoryNIO storeFactory = new PagingStoreFactoryNIO(getPageDir(),
+                                                                     100, null,
                                 new OrderedExecutorFactory(Executors.newCachedThreadPool()),
                                 true);
       
@@ -81,11 +83,11 @@ public class PagingManagerImplTest extends UnitTestCase
 
       ServerMessage msg = createMessage(1l, new SimpleString("simple-test"), createRandomBuffer(10));
 
-      Assert.assertFalse(store.page(msg));
+      Assert.assertFalse(store.page(msg, new RoutingContextImpl(null)));
 
       store.startPaging();
 
-      Assert.assertTrue(store.page(msg));
+      Assert.assertTrue(store.page(msg, new RoutingContextImpl(null)));
 
       Page page = store.depage();
 
@@ -98,7 +100,7 @@ public class PagingManagerImplTest extends UnitTestCase
       Assert.assertEquals(1, msgs.size());
 
       UnitTestCase.assertEqualsByteArrays(msg.getBodyBuffer().writerIndex(), msg.getBodyBuffer().toByteBuffer().array(), msgs.get(0)
-                                                                                          .getMessage(null)
+                                                                                          .getMessage()
                                                                                           .getBodyBuffer()
                                                                                           .toByteBuffer()
                                                                                           .array());
@@ -107,7 +109,7 @@ public class PagingManagerImplTest extends UnitTestCase
 
       Assert.assertNull(store.depage());
 
-      Assert.assertFalse(store.page(msg));
+      Assert.assertFalse(store.page(msg, new RoutingContextImpl(null)));
    }
 
    // Package protected ---------------------------------------------

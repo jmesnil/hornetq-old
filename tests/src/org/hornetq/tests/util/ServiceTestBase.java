@@ -15,7 +15,9 @@ package org.hornetq.tests.util;
 
 import java.io.File;
 import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.management.MBeanServer;
@@ -25,21 +27,26 @@ import junit.framework.Assert;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientMessage;
 import org.hornetq.api.core.client.ClientSession;
+import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.core.client.impl.ClientSessionFactoryImpl;
 import org.hornetq.core.config.Configuration;
-import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.remoting.impl.invm.InVMAcceptorFactory;
 import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
+import org.hornetq.core.remoting.impl.invm.InVMRegistry;
 import org.hornetq.core.remoting.impl.netty.NettyAcceptorFactory;
 import org.hornetq.core.remoting.impl.netty.NettyConnectorFactory;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.HornetQServers;
+import org.hornetq.core.server.NodeManager;
+import org.hornetq.core.server.impl.HornetQServerImpl;
 import org.hornetq.core.settings.impl.AddressSettings;
 import org.hornetq.jms.client.HornetQBytesMessage;
 import org.hornetq.jms.client.HornetQTextMessage;
 import org.hornetq.spi.core.security.HornetQSecurityManager;
+import org.hornetq.spi.core.security.HornetQSecurityManagerImpl;
 
 /**
  * 
@@ -57,11 +64,85 @@ public abstract class ServiceTestBase extends UnitTestCase
 
    protected static final String INVM_ACCEPTOR_FACTORY = InVMAcceptorFactory.class.getCanonicalName();
 
-   protected static final String INVM_CONNECTOR_FACTORY = InVMConnectorFactory.class.getCanonicalName();
+   public static final String INVM_CONNECTOR_FACTORY = InVMConnectorFactory.class.getCanonicalName();
 
    protected static final String NETTY_ACCEPTOR_FACTORY = NettyAcceptorFactory.class.getCanonicalName();
 
    protected static final String NETTY_CONNECTOR_FACTORY = NettyConnectorFactory.class.getCanonicalName();
+
+   private List<ServerLocator> locators = new ArrayList<ServerLocator>();
+
+   @Override
+   protected void tearDown() throws Exception
+   {
+      for (ServerLocator locator : locators)
+      {
+         try
+         {
+            locator.close();
+         }
+         catch (Exception e)
+         {
+            e.printStackTrace();
+         }
+      }
+      locators.clear();
+      super.tearDown();
+      checkFreePort(5445);
+      checkFreePort(5446);
+      checkFreePort(5447);
+      if (InVMRegistry.instance.size() > 0)
+      {
+         System.exit(0);
+      }
+   }
+
+   protected static Map<String, Object> generateParams(final int node, final boolean netty)
+   {
+      Map<String, Object> params = new HashMap<String, Object>();
+
+      if (netty)
+      {
+         params.put(org.hornetq.core.remoting.impl.netty.TransportConstants.PORT_PROP_NAME,
+                    org.hornetq.core.remoting.impl.netty.TransportConstants.DEFAULT_PORT + node);
+      }
+      else
+      {
+         params.put(org.hornetq.core.remoting.impl.invm.TransportConstants.SERVER_ID_PROP_NAME, node);
+      }
+
+      return params;
+   }
+
+   protected static TransportConfiguration createTransportConfiguration(boolean netty,
+                                                                        boolean acceptor,
+                                                                        Map<String, Object> params)
+   {
+      String className;
+      if (netty)
+      {
+         if (acceptor)
+         {
+            className = NettyAcceptorFactory.class.getName();
+         }
+         else
+         {
+            className = NettyConnectorFactory.class.getName();
+         }
+      }
+      else
+      {
+         if (acceptor)
+         {
+            className = InVMAcceptorFactory.class.getName();
+         }
+         else
+         {
+            className = InVMConnectorFactory.class.getName();
+         }
+      }
+      return new TransportConfiguration(className, params);
+   }
 
    // Static --------------------------------------------------------
    private final Logger log = Logger.getLogger(this.getClass());
@@ -157,6 +238,47 @@ public abstract class ServiceTestBase extends UnitTestCase
       return createServer(realFiles, configuration, -1, -1, new HashMap<String, AddressSettings>());
    }
 
+   protected HornetQServer createInVMFailoverServer(final boolean realFiles,
+                                                    final Configuration configuration,
+                                                    NodeManager nodeManager)
+   {
+      return createInVMFailoverServer(realFiles,
+                                      configuration,
+                                      -1,
+                                      -1,
+                                      new HashMap<String, AddressSettings>(),
+                                      nodeManager);
+   }
+
+   protected HornetQServer createInVMFailoverServer(final boolean realFiles,
+                                                    final Configuration configuration,
+                                                    final int pageSize,
+                                                    final int maxAddressSize,
+                                                    final Map<String, AddressSettings> settings,
+                                                    NodeManager nodeManager)
+   {
+      HornetQServer server;
+      HornetQSecurityManager securityManager = new HornetQSecurityManagerImpl();
+      configuration.setPersistenceEnabled(realFiles);
+      server = new InVMNodeManagerServer(configuration,
+                                         ManagementFactory.getPlatformMBeanServer(),
+                                         securityManager,
+                                         nodeManager);
+
+      for (Map.Entry<String, AddressSettings> setting : settings.entrySet())
+      {
+         server.getAddressSettingsRepository().addMatch(setting.getKey(), setting.getValue());
+      }
+
+      AddressSettings defaultSetting = new AddressSettings();
+      defaultSetting.setPageSizeBytes(pageSize);
+      defaultSetting.setMaxSizeBytes(maxAddressSize);
+
+      server.getAddressSettingsRepository().addMatch("#", defaultSetting);
+
+      return server;
+   }
+
    protected HornetQServer createServer(final boolean realFiles,
                                         final Configuration configuration,
                                         final HornetQSecurityManager securityManager)
@@ -165,14 +287,16 @@ public abstract class ServiceTestBase extends UnitTestCase
 
       if (realFiles)
       {
-         server = HornetQServers.newHornetQServer(configuration, ManagementFactory.getPlatformMBeanServer(), securityManager);
+         server = HornetQServers.newHornetQServer(configuration,
+                                                  ManagementFactory.getPlatformMBeanServer(),
+                                                  securityManager);
       }
       else
       {
          server = HornetQServers.newHornetQServer(configuration,
-                                           ManagementFactory.getPlatformMBeanServer(),
-                                           securityManager,
-                                           false);
+                                                  ManagementFactory.getPlatformMBeanServer(),
+                                                  securityManager,
+                                                  false);
       }
 
       Map<String, AddressSettings> settings = new HashMap<String, AddressSettings>();
@@ -197,7 +321,7 @@ public abstract class ServiceTestBase extends UnitTestCase
       if (isNetty)
       {
          return createServer(realFiles,
-                             createClusteredDefaultConfig(index, params, ServiceTestBase.NETTY_ACCEPTOR_FACTORY),
+                             createClusteredDefaultConfig(index, params, NETTY_ACCEPTOR_FACTORY),
                              -1,
                              -1,
                              new HashMap<String, AddressSettings>());
@@ -205,7 +329,7 @@ public abstract class ServiceTestBase extends UnitTestCase
       else
       {
          return createServer(realFiles,
-                             createClusteredDefaultConfig(index, params, ServiceTestBase.INVM_ACCEPTOR_FACTORY),
+                             createClusteredDefaultConfig(index, params, INVM_ACCEPTOR_FACTORY),
                              -1,
                              -1,
                              new HashMap<String, AddressSettings>());
@@ -222,7 +346,7 @@ public abstract class ServiceTestBase extends UnitTestCase
       if (isNetty)
       {
          return createServer(realFiles,
-                             createClusteredDefaultConfig(index, params, ServiceTestBase.NETTY_ACCEPTOR_FACTORY),
+                             createClusteredDefaultConfig(index, params, NETTY_ACCEPTOR_FACTORY),
                              pageSize,
                              maxAddressSize,
                              new HashMap<String, AddressSettings>());
@@ -230,124 +354,58 @@ public abstract class ServiceTestBase extends UnitTestCase
       else
       {
          return createServer(realFiles,
-                             createClusteredDefaultConfig(index, params, ServiceTestBase.INVM_ACCEPTOR_FACTORY),
+                             createClusteredDefaultConfig(index, params, INVM_ACCEPTOR_FACTORY),
                              -1,
                              -1,
                              new HashMap<String, AddressSettings>());
       }
    }
 
-   protected Configuration createDefaultConfig()
-   {
-      return createDefaultConfig(false);
-   }
-
-   protected Configuration createDefaultConfig(final boolean netty)
-   {
-      if (netty)
-      {
-         return createDefaultConfig(new HashMap<String, Object>(),
-                                    ServiceTestBase.INVM_ACCEPTOR_FACTORY,
-                                    ServiceTestBase.NETTY_ACCEPTOR_FACTORY);
-      }
-      else
-      {
-         return createDefaultConfig(new HashMap<String, Object>(), ServiceTestBase.INVM_ACCEPTOR_FACTORY);
-      }
-   }
-
-   protected Configuration createClusteredDefaultConfig(final int index,
-                                                        final Map<String, Object> params,
-                                                        final String... acceptors)
-   {
-      Configuration config = createDefaultConfig(index, params, acceptors);
-
-      config.setClustered(true);
-
-      return config;
-   }
-
-   protected Configuration createDefaultConfig(final int index,
-                                               final Map<String, Object> params,
-                                               final String... acceptors)
-   {
-      Configuration configuration = new ConfigurationImpl();
-      configuration.setSecurityEnabled(false);
-      configuration.setBindingsDirectory(getBindingsDir(index, false));
-      configuration.setJournalMinFiles(2);
-      configuration.setJournalDirectory(getJournalDir(index, false));
-      configuration.setJournalFileSize(100 * 1024);
-      configuration.setJournalType(getDefaultJournalType());
-      configuration.setPagingDirectory(getPageDir(index, false));
-      configuration.setLargeMessagesDirectory(getLargeMessagesDir(index, false));
-      configuration.setJournalCompactMinFiles(0);
-      configuration.setJournalCompactPercentage(0);
-
-      configuration.getAcceptorConfigurations().clear();
-
-      for (String acceptor : acceptors)
-      {
-         TransportConfiguration transportConfig = new TransportConfiguration(acceptor, params);
-         configuration.getAcceptorConfigurations().add(transportConfig);
-      }
-
-      return configuration;
-   }
-
-   protected Configuration createDefaultConfig(final Map<String, Object> params, final String... acceptors)
-   {
-      Configuration configuration = new ConfigurationImpl();
-      configuration.setSecurityEnabled(false);
-      configuration.setJMXManagementEnabled(false);
-      configuration.setBindingsDirectory(getBindingsDir());
-      configuration.setJournalMinFiles(2);
-      configuration.setJournalDirectory(getJournalDir());
-      configuration.setJournalFileSize(100 * 1024);
-      configuration.setPagingDirectory(getPageDir());
-      configuration.setLargeMessagesDirectory(getLargeMessagesDir());
-      configuration.setJournalCompactMinFiles(0);
-      configuration.setJournalCompactPercentage(0);
-
-      configuration.setFileDeploymentEnabled(false);
-
-      configuration.setJournalType(getDefaultJournalType());
-
-      configuration.getAcceptorConfigurations().clear();
-
-      for (String acceptor : acceptors)
-      {
-         TransportConfiguration transportConfig = new TransportConfiguration(acceptor, params);
-         configuration.getAcceptorConfigurations().add(transportConfig);
-      }
-
-      return configuration;
-   }
-
-   protected ClientSessionFactoryImpl createFactory(final boolean isNetty)
+   protected ServerLocator createFactory(final boolean isNetty) throws Exception
    {
       if (isNetty)
       {
-         return createNettyFactory();
+         return createNettyNonHALocator();
       }
       else
       {
-         return createInVMFactory();
+         return createInVMNonHALocator();
       }
    }
 
-   protected ClientSessionFactoryImpl createInVMFactory()
+   protected void createQueue(String address, String queue) throws Exception
    {
-      return createFactory(ServiceTestBase.INVM_CONNECTOR_FACTORY);
+      ServerLocator locator = createInVMNonHALocator();
+      ClientSessionFactory sf = locator.createSessionFactory();
+      ClientSession session = sf.createSession();
+      session.createQueue(address, queue);
+      session.close();
+      sf.close();
+      locator.close();
    }
 
-   protected ClientSessionFactoryImpl createNettyFactory()
+   protected ServerLocator createInVMNonHALocator()
    {
-      return createFactory(ServiceTestBase.NETTY_CONNECTOR_FACTORY);
+      return createNonHALocator(false);
    }
 
-   protected ClientSessionFactoryImpl createFactory(final String connectorClass)
+   protected ServerLocator createNettyNonHALocator()
    {
-      return (ClientSessionFactoryImpl) HornetQClient.createClientSessionFactory(new TransportConfiguration(connectorClass), null);
+      return createNonHALocator(true);
+   }
+
+   protected ServerLocator createNonHALocator(final boolean isNetty)
+   {
+      ServerLocator locatorWithoutHA = isNetty ? HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(NETTY_CONNECTOR_FACTORY))
+                                              : HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(INVM_CONNECTOR_FACTORY));
+      locators.add(locatorWithoutHA);
+      return locatorWithoutHA;
+   }
+
+   protected ClientSessionFactoryImpl createFactory(final String connectorClass) throws Exception
+   {
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(connectorClass));
+      return (ClientSessionFactoryImpl)locator.createSessionFactory();
 
    }
 
@@ -365,10 +423,10 @@ public abstract class ServiceTestBase extends UnitTestCase
    protected ClientMessage createTextMessage(final ClientSession session, final String s, final boolean durable)
    {
       ClientMessage message = session.createMessage(HornetQTextMessage.TYPE,
-                                                          durable,
-                                                          0,
-                                                          System.currentTimeMillis(),
-                                                          (byte)1);
+                                                    durable,
+                                                    0,
+                                                    System.currentTimeMillis(),
+                                                    (byte)1);
       message.getBodyBuffer().writeString(s);
       return message;
    }
@@ -376,10 +434,10 @@ public abstract class ServiceTestBase extends UnitTestCase
    protected ClientMessage createBytesMessage(final ClientSession session, final byte[] b, final boolean durable)
    {
       ClientMessage message = session.createMessage(HornetQBytesMessage.TYPE,
-                                                          durable,
-                                                          0,
-                                                          System.currentTimeMillis(),
-                                                          (byte)1);
+                                                    durable,
+                                                    0,
+                                                    System.currentTimeMillis(),
+                                                    (byte)1);
       message.getBodyBuffer().writeBytes(b);
       return message;
    }
@@ -418,5 +476,50 @@ public abstract class ServiceTestBase extends UnitTestCase
    // Private -------------------------------------------------------
 
    // Inner classes -------------------------------------------------
+   class InVMNodeManagerServer extends HornetQServerImpl
+   {
+      final NodeManager nodeManager;
 
+      public InVMNodeManagerServer(NodeManager nodeManager)
+      {
+         super();
+         this.nodeManager = nodeManager;
+      }
+
+      public InVMNodeManagerServer(Configuration configuration, NodeManager nodeManager)
+      {
+         super(configuration);
+         this.nodeManager = nodeManager;
+      }
+
+      public InVMNodeManagerServer(Configuration configuration, MBeanServer mbeanServer, NodeManager nodeManager)
+      {
+         super(configuration, mbeanServer);
+         this.nodeManager = nodeManager;
+      }
+
+      public InVMNodeManagerServer(Configuration configuration,
+                                   HornetQSecurityManager securityManager,
+                                   NodeManager nodeManager)
+      {
+         super(configuration, securityManager);
+         this.nodeManager = nodeManager;
+      }
+
+      public InVMNodeManagerServer(Configuration configuration,
+                                   MBeanServer mbeanServer,
+                                   HornetQSecurityManager securityManager,
+                                   NodeManager nodeManager)
+      {
+         super(configuration, mbeanServer, securityManager);
+         this.nodeManager = nodeManager;
+      }
+
+      @Override
+      protected NodeManager createNodeManager(String directory)
+      {
+         return nodeManager;
+      }
+
+   }
 }

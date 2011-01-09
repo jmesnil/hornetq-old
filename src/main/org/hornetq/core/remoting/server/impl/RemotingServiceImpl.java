@@ -374,9 +374,9 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       if (config.isBackup())
       {
          serverSideReplicatingConnection = entry.connection;
-      }
+      }      
    }
-
+   
    public void connectionDestroyed(final Object connectionID)
    {
       ConnectionEntry conn = connections.get(connectionID);
@@ -422,6 +422,10 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       // If the connection fail() is called then the sessions on the backup will get closed.
 
       // Connections should only fail when TTL is exceeded
+   }
+   
+   public void connectionReadyForWrites(final Object connectionID, final boolean ready)
+   {
    }
 
    public void addInterceptor(final Interceptor interceptor)
@@ -566,4 +570,5 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
          }
       }
    }
+
 }

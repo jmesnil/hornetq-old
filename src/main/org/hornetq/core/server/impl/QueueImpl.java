@@ -32,8 +32,11 @@ import org.hornetq.api.core.Message;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.core.filter.Filter;
 import org.hornetq.core.logging.Logger;
+import org.hornetq.core.paging.cursor.PageSubscription;
+import org.hornetq.core.paging.cursor.PagedReference;
 import org.hornetq.core.persistence.StorageManager;
 import org.hornetq.core.postoffice.Bindings;
+import org.hornetq.core.postoffice.DuplicateIDCache;
 import org.hornetq.core.postoffice.PostOffice;
 import org.hornetq.core.server.Consumer;
 import org.hornetq.core.server.HandleStatus;
@@ -89,6 +92,10 @@ public class QueueImpl implements Queue
    private final boolean temporary;
 
    private final PostOffice postOffice;
+   
+   private final PageSubscription pageSubscription;
+   
+   private final LinkedListIterator<PagedReference> pageIterator;
 
    private final ConcurrentLinkedQueue<MessageReference> concurrentQueue = new ConcurrentLinkedQueue<MessageReference>();
 
@@ -105,6 +112,8 @@ public class QueueImpl implements Queue
    private boolean paused;
 
    private final Runnable deliverRunner = new DeliverRunner();
+
+   private final Runnable depageRunner = new DepageRunner();
 
    private final StorageManager storageManager;
 
@@ -141,11 +150,39 @@ public class QueueImpl implements Queue
    private volatile boolean checkDirect;
 
    private volatile boolean directDeliver = true;
+   
+   public QueueImpl(final long id,
+                    final SimpleString address,
+                    final SimpleString name,
+                    final Filter filter,
+                    final boolean durable,
+                    final boolean temporary,
+                    final ScheduledExecutorService scheduledExecutor,
+                    final PostOffice postOffice,
+                    final StorageManager storageManager,
+                    final HierarchicalRepository<AddressSettings> addressSettingsRepository,
+                    final Executor executor)
+   {
+      this(id,
+          address,
+          name,
+          filter,
+          null,
+          durable,
+          temporary,
+          scheduledExecutor,
+          postOffice,
+          storageManager,
+          addressSettingsRepository,
+          executor);
+   }
+
 
    public QueueImpl(final long id,
                     final SimpleString address,
                     final SimpleString name,
                     final Filter filter,
+                    final PageSubscription pageSubscription,
                     final boolean durable,
                     final boolean temporary,
                     final ScheduledExecutorService scheduledExecutor,
@@ -161,6 +198,8 @@ public class QueueImpl implements Queue
       this.name = name;
 
       this.filter = filter;
+      
+      this.pageSubscription = pageSubscription;
 
       this.durable = durable;
 
@@ -183,6 +222,16 @@ public class QueueImpl implements Queue
       else
       {
          expiryAddress = null;
+      }
+      
+      if (pageSubscription != null)
+      {
+         pageSubscription.setQueue(this);
+         this.pageIterator = pageSubscription.iterator();
+      }
+      else
+      {
+         this.pageIterator = null;
       }
 
       this.executor = executor;
@@ -219,7 +268,7 @@ public class QueueImpl implements Queue
 
    public void route(final ServerMessage message, final RoutingContext context) throws Exception
    {
-      context.addQueue(this);
+      context.addQueue(address, this);
    }
 
    // Queue implementation ----------------------------------------------------------------------------------------
@@ -238,12 +287,22 @@ public class QueueImpl implements Queue
    {
       return name;
    }
+   
+   public SimpleString getAddress()
+   {
+      return address;
+   }
 
    public long getID()
    {
       return id;
    }
 
+   public PageSubscription getPageSubscription()
+   {
+      return pageSubscription;
+   }
+   
    public Filter getFilter()
    {
       return filter;
@@ -296,7 +355,7 @@ public class QueueImpl implements Queue
       // We don't recompute it on every delivery since executing isEmpty is expensive for a ConcurrentQueue
       if (checkDirect)
       {
-         if (direct && !directDeliver && concurrentQueue.isEmpty() && messageReferences.isEmpty())
+         if (direct && !directDeliver && concurrentQueue.isEmpty() && messageReferences.isEmpty() && !pageIterator.hasNext() && !pageSubscription.isPaging())
          {
             // We must block on the executor to ensure any async deliveries have completed or we might get out of order
             // deliveries
@@ -595,13 +654,20 @@ public class QueueImpl implements Queue
       return null;
    }
 
-   public int getMessageCount()
+   public long getMessageCount()
    {
       blockOnExecutorFuture();
 
       synchronized (this)
       {
-         return messageReferences.size() + getScheduledCount() + getDeliveringCount();
+         if (pageSubscription != null)
+         {
+            return messageReferences.size() + getScheduledCount() + getDeliveringCount() + pageSubscription.getMessageCount();
+         }
+         else
+         {
+            return messageReferences.size() + getScheduledCount() + getDeliveringCount();
+         }
       }
    }
 
@@ -622,32 +688,46 @@ public class QueueImpl implements Queue
 
    public void acknowledge(final MessageReference ref) throws Exception
    {
-      ServerMessage message = ref.getMessage();
-
-      boolean durableRef = message.isDurable() && durable;
-
-      if (durableRef)
+      if (ref.isPaged())
       {
-         storageManager.storeAcknowledge(id, message.getMessageID());
+         pageSubscription.ack((PagedReference)ref);
+      }
+      else
+      {
+         ServerMessage message = ref.getMessage();
+   
+         boolean durableRef = message.isDurable() && durable;
+   
+         if (durableRef)
+         {
+            storageManager.storeAcknowledge(id, message.getMessageID());
+         }
+         postAcknowledge(ref);
       }
 
-      postAcknowledge(ref);
    }
 
    public void acknowledge(final Transaction tx, final MessageReference ref) throws Exception
    {
-      ServerMessage message = ref.getMessage();
-
-      boolean durableRef = message.isDurable() && durable;
-
-      if (durableRef)
+      if (ref.isPaged())
       {
-         storageManager.storeAcknowledgeTransactional(tx.getID(), id, message.getMessageID());
-
-         tx.setContainsPersistent();
+         pageSubscription.ackTx(tx, (PagedReference)ref);
       }
-
-      getRefsOperation(tx).addAck(ref);
+      else
+      {
+         ServerMessage message = ref.getMessage();
+   
+         boolean durableRef = message.isDurable() && durable;
+   
+         if (durableRef)
+         {
+            storageManager.storeAcknowledgeTransactional(tx.getID(), id, message.getMessageID());
+   
+            tx.setContainsPersistent();
+         }
+   
+         getRefsOperation(tx).addAck(ref);
+      }
    }
 
    public void reacknowledge(final Transaction tx, final MessageReference ref) throws Exception
@@ -902,7 +982,15 @@ public class QueueImpl implements Queue
          {
             iter.remove();
             deliveringCount.incrementAndGet();
-            move(toAddress, ref);
+            try
+            {
+               move(toAddress, ref);
+            }
+            catch (Exception e)
+            {
+               deliveringCount.decrementAndGet();
+               throw e;
+            }
             return true;
          }
       }
@@ -914,32 +1002,69 @@ public class QueueImpl implements Queue
       Transaction tx = new TransactionImpl(storageManager);
 
       int count = 0;
-      Iterator<MessageReference> iter = iterator();
 
-      while (iter.hasNext())
+      try
       {
-         MessageReference ref = iter.next();
-         if (filter == null || filter.match(ref.getMessage()))
+         Iterator<MessageReference> iter = iterator();
+         
+         DuplicateIDCache targetDuplicateCache = postOffice.getDuplicateIDCache(toAddress);
+   
+         while (iter.hasNext())
          {
-            deliveringCount.incrementAndGet();
-            move(toAddress, tx, ref, false);
-            iter.remove();
-            count++;
+            MessageReference ref = iter.next();
+            if (filter == null || filter.match(ref.getMessage()))
+            {
+               boolean ignored = false;
+               
+               deliveringCount.incrementAndGet();
+               count++;
+
+               byte [] duplicateBytes = ref.getMessage().getDuplicateIDBytes();
+               if (duplicateBytes != null)
+               {
+                  if (targetDuplicateCache.contains(duplicateBytes))
+                  {
+                     log.info("Message with duplicate ID " + ref.getMessage().getDuplicateProperty() + " was already set at " + toAddress + ". Move from " + this.address + " being ignored and message removed from " + this.address);
+                     acknowledge(tx, ref);
+                     ignored = true;
+                  }
+               }
+               if (!ignored)
+               {
+                  move(toAddress, tx, ref, false);
+               }
+               iter.remove();
+            }
          }
+   
+         List<MessageReference> cancelled = scheduledDeliveryHandler.cancel(filter);
+         for (MessageReference ref : cancelled)
+         {
+            byte [] duplicateBytes = ref.getMessage().getDuplicateIDBytes();
+            if (duplicateBytes != null)
+            {
+               if (targetDuplicateCache.contains(duplicateBytes))
+               {
+                  log.info("Message with duplicate ID " + ref.getMessage().getDuplicateProperty() + " was already set at " + toAddress + ". Move from " + this.address + " being ignored");
+                  continue;
+               }
+            }
+   
+            deliveringCount.incrementAndGet();
+            count++;
+            move(toAddress, tx, ref, false);
+            acknowledge(tx, ref);
+         }
+   
+         tx.commit();
+   
+         return count;
       }
-
-      List<MessageReference> cancelled = scheduledDeliveryHandler.cancel(filter);
-      for (MessageReference ref : cancelled)
+      catch (Exception e)
       {
-         deliveringCount.incrementAndGet();
-         move(toAddress, tx, ref, false);
-         acknowledge(tx, ref);
-         count++;
+         deliveringCount.addAndGet(-count);
+         throw e;
       }
-
-      tx.commit();
-
-      return count;
    }
 
    public synchronized boolean changeReferencePriority(final long messageID, final byte newPriority) throws Exception
@@ -1182,6 +1307,48 @@ public class QueueImpl implements Queue
             pos = 0;
          }
       }
+      
+      if (pageIterator != null && messageReferences.size() == 0 && pageIterator.hasNext())
+      {
+         scheduleDepage();
+      }
+   }
+   
+   private void scheduleDepage()
+   {
+      executor.execute(depageRunner);
+   }
+   
+   private void depage()
+   {
+      if (paused || consumerList.isEmpty())
+      {
+         return;
+      }
+      
+      int msgsToDeliver = MAX_DELIVERIES_IN_LOOP - (messageReferences.size() + getScheduledCount() + concurrentQueue.size());
+      
+      if (msgsToDeliver > 0)
+      {
+         //System.out.println("Depaging " + msgsToDeliver + " messages");
+         //System.out.println("Depage "  + msgsToDeliver + " now.. there are msgRef = " + messageReferences.size() + " scheduled = " + getScheduledCount() + " concurrentQueue.size() = " + concurrentQueue.size());
+   
+         int nmessages = 0;
+         while (nmessages < msgsToDeliver && pageIterator.hasNext())
+         {
+            nmessages ++;
+            addTail(pageIterator.next(), false);
+            pageIterator.remove();
+         }
+         
+         //System.out.println("Depaged " + nmessages);
+      }
+//      else
+//      {
+//         System.out.println("Depaging not being done now.. there are msgRef = " + messageReferences.size() + " scheduled = " + getScheduledCount() + " concurrentQueue.size() = " + concurrentQueue.size());
+//      }
+      
+      deliverAsync();
    }
 
    private void internalAddRedistributor(final Executor executor)
@@ -1207,7 +1374,8 @@ public class QueueImpl implements Queue
    {
       ServerMessage message = reference.getMessage();
 
-      if (message.isDurable() && durable)
+      // TODO: DeliveryCount on paging
+      if (message.isDurable() && durable && !reference.isPaged())
       {
          storageManager.updateDeliveryCount(reference);
       }
@@ -1517,6 +1685,11 @@ public class QueueImpl implements Queue
       }
 
       queue.deliveringCount.decrementAndGet();
+      
+      if (queue.deliveringCount.get() < 0)
+      {
+         new Exception("DeliveringCount became negative").printStackTrace();
+      }
 
       try
       {
@@ -1636,6 +1809,10 @@ public class QueueImpl implements Queue
       public void beforeRollback(final Transaction tx) throws Exception
       {
       }
+      
+      public List<MessageReference> getRelatedMessageReferences() {
+         return refsToAck;
+      }
    }
 
    private class DelayedAddRedistributor implements Runnable
@@ -1665,6 +1842,21 @@ public class QueueImpl implements Queue
          try
          {
             deliver();
+         }
+         catch (Exception e)
+         {
+            log.error("Failed to deliver", e);
+         }
+      }
+   }
+
+   private class DepageRunner implements Runnable
+   {
+      public void run()
+      {
+         try
+         {
+            depage();
          }
          catch (Exception e)
          {

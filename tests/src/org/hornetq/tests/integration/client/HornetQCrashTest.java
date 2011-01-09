@@ -1,40 +1,46 @@
 package org.hornetq.tests.integration.client;
 
 import junit.framework.Assert;
-import junit.framework.TestCase;
 
 import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.Interceptor;
 import org.hornetq.api.core.Message;
 import org.hornetq.api.core.TransportConfiguration;
-import org.hornetq.api.core.client.*;
+import org.hornetq.api.core.client.ClientMessage;
+import org.hornetq.api.core.client.ClientProducer;
+import org.hornetq.api.core.client.ClientSession;
+import org.hornetq.api.core.client.ClientSessionFactory;
+import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.SendAcknowledgementHandler;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.core.config.Configuration;
-import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.protocol.core.Packet;
 import org.hornetq.core.protocol.core.impl.PacketImpl;
 import org.hornetq.core.remoting.impl.invm.InVMAcceptorFactory;
-import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.HornetQServers;
 import org.hornetq.spi.core.protocol.RemotingConnection;
+import org.hornetq.tests.util.ServiceTestBase;
+import org.hornetq.tests.util.UnitTestCase;
 
 /**
  * 
  * From https://jira.jboss.org/jira/browse/HORNETQ-144
  * 
  */
-public class HornetQCrashTest extends TestCase
+public class HornetQCrashTest extends UnitTestCase
 {
    private static final Logger log = Logger.getLogger(HornetQCrashTest.class);
 
    public HornetQServer server;
 
    private volatile boolean ackReceived;
+   private ServerLocator locator;
 
    public void testHang() throws Exception
    {
-      Configuration configuration = new ConfigurationImpl();
+      Configuration configuration = createDefaultConfig();
       configuration.setPersistenceEnabled(false);
       configuration.setSecurityEnabled(false);
       configuration.getAcceptorConfigurations().add(new TransportConfiguration(InVMAcceptorFactory.class.getName()));
@@ -45,10 +51,13 @@ public class HornetQCrashTest extends TestCase
 
       server.getRemotingService().addInterceptor(new AckInterceptor(server));
 
-      ClientSessionFactory clientSessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+
+
 
       // Force an ack at once - this means the send call will block
-      clientSessionFactory.setConfirmationWindowSize(1);
+      locator.setConfirmationWindowSize(1);
+
+      ClientSessionFactory clientSessionFactory = locator.createSessionFactory();
 
       ClientSession session = clientSessionFactory.createSession();
 
@@ -110,8 +119,19 @@ public class HornetQCrashTest extends TestCase
    }
 
    @Override
+   protected void setUp() throws Exception
+   {
+      super.setUp();
+
+
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+   }
+
+   @Override
    protected void tearDown() throws Exception
    {
+      locator.close();
+
       super.tearDown();
 
       server = null;

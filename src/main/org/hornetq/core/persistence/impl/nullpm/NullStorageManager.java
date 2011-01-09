@@ -13,7 +13,6 @@
 
 package org.hornetq.core.persistence.impl.nullpm;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -22,15 +21,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.transaction.xa.Xid;
 
-import org.hornetq.api.core.HornetQBuffer;
-import org.hornetq.api.core.HornetQBuffers;
 import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.core.journal.IOAsyncTask;
 import org.hornetq.core.journal.JournalLoadInformation;
+import org.hornetq.core.message.impl.MessageInternal;
 import org.hornetq.core.paging.PageTransactionInfo;
 import org.hornetq.core.paging.PagedMessage;
 import org.hornetq.core.paging.PagingManager;
+import org.hornetq.core.paging.cursor.PagePosition;
 import org.hornetq.core.persistence.GroupingInfo;
 import org.hornetq.core.persistence.OperationContext;
 import org.hornetq.core.persistence.QueueBindingInfo;
@@ -46,7 +45,6 @@ import org.hornetq.core.server.Queue;
 import org.hornetq.core.server.ServerMessage;
 import org.hornetq.core.server.group.impl.GroupBinding;
 import org.hornetq.core.transaction.ResourceManager;
-import org.hornetq.utils.UUID;
 
 /**
  * 
@@ -60,19 +58,53 @@ public class NullStorageManager implements StorageManager
 {
    private final AtomicLong idSequence = new AtomicLong(0);
 
-   private UUID id;
-
    private volatile boolean started;
-
-   public UUID getPersistentID()
+   
+   private static final OperationContext dummyContext = new OperationContext()
    {
-      return id;
-   }
-
-   public void setPersistentID(final UUID id)
-   {
-      this.id = id;
-   }
+      
+      public void onError(int errorCode, String errorMessage)
+      {
+      }
+      
+      public void done()
+      {
+      }
+      
+      public void storeLineUp()
+      {
+      }
+      
+      public boolean waitCompletion(long timeout) throws Exception
+      {
+         return true;
+      }
+      
+      public void waitCompletion() throws Exception
+      {
+      }
+      
+      public void replicationLineUp()
+      {
+      }
+      
+      public void replicationDone()
+      {
+      }
+      
+      public void pageSyncLineUp()
+      {
+      }
+      
+      public void pageSyncDone()
+      {
+      }
+      
+      public void executeOnCompletion(IOAsyncTask runnable)
+      {
+         runnable.done();
+      }
+   };
 
    public void sync()
    {
@@ -200,13 +232,11 @@ public class NullStorageManager implements StorageManager
       return new NullStorageLargeServerMessage();
    }
 
-   public LargeServerMessage createLargeMessage(final long id, final byte[] header)
+   public LargeServerMessage createLargeMessage(final long id, final MessageInternal message)
    {
       NullStorageLargeServerMessage largeMessage = new NullStorageLargeServerMessage();
-
-      HornetQBuffer headerBuffer = HornetQBuffers.wrappedBuffer(header);
-
-      largeMessage.decodeHeadersAndProperties(headerBuffer);
+      
+      largeMessage.copyHeadersAndProperties(message);
 
       largeMessage.setMessageID(id);
 
@@ -247,8 +277,6 @@ public class NullStorageManager implements StorageManager
          throw new IllegalStateException("Not started");
       }
 
-      id = null;
-
       idSequence.set(0);
 
       started = false;
@@ -267,6 +295,7 @@ public class NullStorageManager implements StorageManager
                                                     final PagingManager pagingManager,
                                                     final ResourceManager resourceManager,
                                                     final Map<Long, Queue> queues,
+                                                    Map<Long, QueueBindingInfo> queueInfos,
                                                     final Map<SimpleString, List<Pair<byte[], Long>>> duplicateIDMap) throws Exception
    {
       return new JournalLoadInformation();
@@ -367,7 +396,7 @@ public class NullStorageManager implements StorageManager
     */
    public OperationContext getContext()
    {
-      return null;
+      return dummyContext;
    }
 
    /* (non-Javadoc)
@@ -375,7 +404,7 @@ public class NullStorageManager implements StorageManager
     */
    public OperationContext newContext(final Executor executor)
    {
-      return null;
+      return dummyContext;
    }
 
    /* (non-Javadoc)
@@ -448,6 +477,72 @@ public class NullStorageManager implements StorageManager
     */
    public void updatePageTransaction(long txID, PageTransactionInfo pageTransaction, int depage) throws Exception
    {
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#storeCursorAcknowledge(long, org.hornetq.core.paging.cursor.PagePosition)
+    */
+   public void storeCursorAcknowledge(long queueID, PagePosition position)
+   {
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#storeCursorAcknowledgeTransactional(long, long, org.hornetq.core.paging.cursor.PagePosition)
+    */
+   public void storeCursorAcknowledgeTransactional(long txID, long queueID, PagePosition position)
+   {
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#deleteCursorAcknowledgeTransactional(long, long)
+    */
+   public void deleteCursorAcknowledgeTransactional(long txID, long ackID) throws Exception
+   {
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#updatePageTransaction(org.hornetq.core.paging.PageTransactionInfo, int)
+    */
+   public void updatePageTransaction(PageTransactionInfo pageTransaction, int depage) throws Exception
+   {
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#storePageCounter(long, long, long)
+    */
+   public long storePageCounter(long txID, long queueID, long value) throws Exception
+   {
+      return 0;
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#deleteIncrementRecord(long, long)
+    */
+   public void deleteIncrementRecord(long txID, long recordID) throws Exception
+   {
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#deletePageCounter(long, long)
+    */
+   public void deletePageCounter(long txID, long recordID) throws Exception
+   {
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#storePageCounterInc(long, long, int)
+    */
+   public long storePageCounterInc(long txID, long queueID, int add) throws Exception
+   {
+      return 0;
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.persistence.StorageManager#storePageCounterInc(long, int)
+    */
+   public long storePageCounterInc(long queueID, int add) throws Exception
+   {
+      return 0;
    }
 
 }

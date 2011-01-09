@@ -45,7 +45,17 @@ public interface DestinationControl
    /**
     * Returns the number of messages currently in this destination.
     */
-   int getMessageCount() throws Exception;
+   long getMessageCount() throws Exception;
+
+   /**
+    * Returns the number of messages that this queue is currently delivering to its consumers.
+    */
+   int getDeliveringCount();
+
+   /**
+    * Returns the number of messages added to this queue since it was created.
+    */
+   long getMessagesAdded();
 
    // Operations ----------------------------------------------------
 

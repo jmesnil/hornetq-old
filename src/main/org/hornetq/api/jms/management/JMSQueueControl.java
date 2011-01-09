@@ -13,7 +13,6 @@
 
 package org.hornetq.api.jms.management;
 
-import java.util.List;
 import java.util.Map;
 
 import javax.management.MBeanOperationInfo;
@@ -51,11 +50,6 @@ public interface JMSQueueControl extends DestinationControl
    void setDeadLetterAddress(@Parameter(name = "deadLetterAddress", desc = "Dead-letter address of the queue") String deadLetterAddress) throws Exception;
 
    /**
-    * Returns the number of messages added to this queue since it was created.
-    */
-   long getMessagesAdded();
-
-   /**
     * Returns the number of scheduled messages in this queue.
     */
    long getScheduledCount();
@@ -64,11 +58,6 @@ public interface JMSQueueControl extends DestinationControl
     * Returns the number of consumers consuming messages from this queue.
     */
    int getConsumerCount();
-
-   /**
-    * Returns the number of messages that this queue is currently delivering to its consumers.
-    */
-   int getDeliveringCount();
 
    /**
     * returns the selector for the queue
@@ -82,7 +71,7 @@ public interface JMSQueueControl extends DestinationControl
     */
    @Operation(desc = "Returns the list of JNDI bindings associated")
    String[] getJNDIBindings();
-   
+
    /**
     * Add the JNDI binding to this destination
     */
@@ -113,7 +102,7 @@ public interface JMSQueueControl extends DestinationControl
     * Using {@code null} or an empty filter will count <em>all</em> messages from this queue.
     */
    @Operation(desc = "Returns the number of the messages in the queue matching the given filter", impact = MBeanOperationInfo.INFO)
-   int countMessages(@Parameter(name = "filter", desc = "A JMS message filter (can be empty)") String filter) throws Exception;
+   long countMessages(@Parameter(name = "filter", desc = "A JMS message filter (can be empty)") String filter) throws Exception;
 
    /**
     * Removes the message corresponding to the specified message ID.
@@ -223,7 +212,6 @@ public interface JMSQueueControl extends DestinationControl
    @Operation(desc = "Reset the message counters", impact = MBeanOperationInfo.INFO)
    void resetMessageCounter() throws Exception;
 
-
    /**
     * Lists the message counter for this queue as a HTML table.
     */
@@ -259,5 +247,8 @@ public interface JMSQueueControl extends DestinationControl
     */
    @Operation(desc = "Resume the queue.", impact = MBeanOperationInfo.ACTION)
    void resume() throws Exception;
+
+   @Operation(desc = "List all the existent consumers on the Queue")
+   String listConsumersAsJSON() throws Exception;
 
 }

@@ -21,19 +21,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 
 import javax.management.MBeanServerInvocationHandler;
 import javax.management.ObjectName;
 import javax.naming.InitialContext;
 
-import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.HornetQClient;
 import org.hornetq.api.core.management.ObjectNameBuilder;
 import org.hornetq.api.core.management.ResourceNames;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.api.jms.management.JMSQueueControl;
 import org.hornetq.api.jms.management.TopicControl;
 import org.hornetq.core.logging.Logger;
+import org.hornetq.core.remoting.impl.netty.NettyConnectorFactory;
 import org.hornetq.core.security.Role;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.integration.bootstrap.HornetQBootstrapServer;
@@ -285,19 +287,23 @@ public class LocalTestServer implements Server, Runnable
                                        final boolean blockOnAcknowledge,
                                        final String ... jndiBindings) throws Exception
    {
-      List<Pair<TransportConfiguration, TransportConfiguration>> connectorConfigs = new ArrayList<Pair<TransportConfiguration, TransportConfiguration>>();
-
-      connectorConfigs.add(new Pair<TransportConfiguration, TransportConfiguration>(new TransportConfiguration("org.hornetq.core.remoting.impl.netty.NettyConnectorFactory"),
-                                                                                    null));
+      List<TransportConfiguration> connectorConfigs = new ArrayList<TransportConfiguration>();
+      connectorConfigs.add(new TransportConfiguration(NettyConnectorFactory.class.getName()));
+      
+      ArrayList<String> connectors = new ArrayList<String>();
+      connectors.add("netty");
 
       getJMSServerManager().createConnectionFactory(objectName,
-                                                    connectorConfigs,
+                                                    false, 
+                                                    JMSFactoryType.CF,
+                                                    connectors,
                                                     clientId,
                                                     HornetQClient.DEFAULT_CLIENT_FAILURE_CHECK_PERIOD,
                                                     HornetQClient.DEFAULT_CONNECTION_TTL,
                                                     HornetQClient.DEFAULT_CALL_TIMEOUT,
                                                     HornetQClient.DEFAULT_CACHE_LARGE_MESSAGE_CLIENT,
                                                     HornetQClient.DEFAULT_MIN_LARGE_MESSAGE_SIZE,
+                                                    HornetQClient.DEFAULT_COMPRESS_LARGE_MESSAGES,
                                                     prefetchSize,
                                                     HornetQClient.DEFAULT_CONSUMER_MAX_RATE,
                                                     HornetQClient.DEFAULT_CONFIRMATION_WINDOW_SIZE,
@@ -319,7 +325,6 @@ public class LocalTestServer implements Server, Runnable
                                                     HornetQClient.DEFAULT_MAX_RETRY_INTERVAL,
                                                     HornetQClient.DEFAULT_RECONNECT_ATTEMPTS,
                                                     HornetQClient.DEFAULT_FAILOVER_ON_INITIAL_CONNECTION,
-                                                    HornetQClient.DEFAULT_FAILOVER_ON_SERVER_SHUTDOWN,
                                                     null,
                                                     jndiBindings);
    }
@@ -391,7 +396,7 @@ public class LocalTestServer implements Server, Runnable
 
    }
 
-   public Integer getMessageCountForQueue(final String queueName) throws Exception
+   public Long getMessageCountForQueue(final String queueName) throws Exception
    {
       JMSQueueControl queue = (JMSQueueControl)getHornetQServer().getManagementService()
                                                                  .getResource(ResourceNames.JMS_QUEUE + queueName);
@@ -401,7 +406,7 @@ public class LocalTestServer implements Server, Runnable
       }
       else
       {
-         return -1;
+         return -1l;
       }
    }
 

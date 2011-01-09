@@ -24,10 +24,10 @@ import javax.jms.MessageConsumer;
 import javax.jms.MessageProducer;
 import javax.jms.Session;
 
-import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.HornetQClient;
 import org.hornetq.api.jms.HornetQJMSClient;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.core.config.Configuration;
 import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.logging.Logger;
@@ -80,7 +80,7 @@ public class FloodServerTest extends UnitTestCase
    {
       super.setUp();
 
-      Configuration conf = new ConfigurationImpl();
+      Configuration conf = createBasicConfig();
       conf.setSecurityEnabled(false);
       conf.setJMXManagementEnabled(true);
       conf.getAcceptorConfigurations().add(new TransportConfiguration(NettyAcceptorFactory.class.getName()));
@@ -121,21 +121,22 @@ public class FloodServerTest extends UnitTestCase
       int retryInterval = 1000;
       double retryIntervalMultiplier = 1.0;
       int reconnectAttempts = -1;
-      boolean failoverOnServerShutdown = true;
       long callTimeout = 30000;
 
-      List<Pair<TransportConfiguration, TransportConfiguration>> connectorConfigs = new ArrayList<Pair<TransportConfiguration, TransportConfiguration>>();
-      connectorConfigs.add(new Pair<TransportConfiguration, TransportConfiguration>(new TransportConfiguration(NettyConnectorFactory.class.getName()),
-                                                                                    null));
+      List<TransportConfiguration> connectorConfigs = new ArrayList<TransportConfiguration>();
+      connectorConfigs.add(new TransportConfiguration(NettyConnectorFactory.class.getName()));
 
       serverManager.createConnectionFactory("ManualReconnectionToSingleServerTest",
-                                            connectorConfigs,
+                                          false,
+                                          JMSFactoryType.CF,
+                                            registerConnectors(server, connectorConfigs),
                                             null,
                                             1000,
                                             HornetQClient.DEFAULT_CONNECTION_TTL,
                                             callTimeout,
                                             HornetQClient.DEFAULT_CACHE_LARGE_MESSAGE_CLIENT,
                                             HornetQClient.DEFAULT_MIN_LARGE_MESSAGE_SIZE,
+                                            HornetQClient.DEFAULT_COMPRESS_LARGE_MESSAGES,
                                             HornetQClient.DEFAULT_CONSUMER_WINDOW_SIZE,
                                             HornetQClient.DEFAULT_CONSUMER_MAX_RATE,
                                             HornetQClient.DEFAULT_CONFIRMATION_WINDOW_SIZE,
@@ -157,7 +158,6 @@ public class FloodServerTest extends UnitTestCase
                                             1000,
                                             reconnectAttempts,
                                             HornetQClient.DEFAULT_FAILOVER_ON_INITIAL_CONNECTION,
-                                            failoverOnServerShutdown,
                                             null,
                                             "/cf");
    }

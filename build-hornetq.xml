@@ -449,6 +449,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${build.src.dir}"/>
@@ -493,6 +494,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${build.src.dir}"/>
@@ -531,6 +533,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${src.main.dir}"/>
@@ -551,6 +554,7 @@
 	             deprecation="${javac.deprecation}"
 	             includeAntRuntime="${javac.include.ant.runtime}"
 	             includeJavaRuntime="${javac.include.java.runtime}"
+                     encoding="${javac.encoding}"
 	             failonerror="${javac.fail.onerror}">
 	         <src>
 	            <pathelement path="${src.main.dir}"/>
@@ -571,6 +575,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${src.main.dir}"/>
@@ -591,6 +596,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${src.main.dir}"/>
@@ -611,6 +617,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${src.main.dir}"/>
@@ -632,6 +639,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${src.main.dir}"/>
@@ -652,6 +660,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${src.main.dir}"/>
@@ -672,6 +681,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${src.main.dir}"/>
@@ -692,6 +702,7 @@
              deprecation="${javac.deprecation}"
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
+             encoding="${javac.encoding}"
              failonerror="${javac.fail.onerror}">
          <src>
             <pathelement path="${build.src.dir}"/>
@@ -1179,9 +1190,11 @@
    <target name="jar-rest-init" depends="jar-jms">
       <ant antfile="build-maven.xml" target="upload-local-target">
 	<property name="artifact.id" value="hornetq-core"/>
+	<property name="file-name" value="hornetq-core"/>
       </ant>
       <ant antfile="build-maven.xml" target="upload-local-target">
 	<property name="artifact.id" value="hornetq-jms"/>
+	<property name="file-name" value="hornetq-jms"/>
       </ant>
    </target>
       
@@ -1586,6 +1599,7 @@
              includeAntRuntime="${javac.include.ant.runtime}"
              includeJavaRuntime="${javac.include.java.runtime}"
              failonerror="${javac.fail.onerror}"
+             encoding="${javac.encoding}"
              srcdir="${test.src.dir}"
              destdir="${test.classes.dir}">
          <classpath refid="test.compilation.classpath"/>
@@ -1604,6 +1618,7 @@
              includeAntRuntime="true"
              includeJavaRuntime="${javac.include.java.runtime}"
              failonerror="${javac.fail.onerror}"
+             encoding="${javac.encoding}"
              srcdir="${test.jms.src.dir}"
              destdir="${test.jms.classes.dir}">
          <classpath refid="jms.test.compilation.classpath"/>
@@ -1622,6 +1637,7 @@
              includeAntRuntime="true"
              includeJavaRuntime="${javac.include.java.runtime}"
              failonerror="${javac.fail.onerror}"
+             encoding="${javac.encoding}"
              srcdir="${test.joram.src.dir}"
              destdir="${test.joram.classes.dir}">
           <classpath refid="joram.test.compilation.classpath"/>
@@ -1640,6 +1656,19 @@
       </antcall>
    </target>
 
+    <target name="management-tests" depends="jar, compile-unit-tests">
+      <antcall inheritall="true" inheritrefs="true" target="tests">
+         <param name="tests.param" value="**/org/hornetq/tests/integration/management/**/*${test-mask}.class"/>
+      </antcall>
+   </target>
+
+
+    <target name="jms-management-tests" depends="jar, compile-unit-tests">
+      <antcall inheritall="true" inheritrefs="true" target="tests">
+         <param name="tests.param" value="**/org/hornetq/tests/integration/jms/server/management/**/*${test-mask}.class"/>
+      </antcall>
+   </target>
+
     <target name="spring-tests" depends="jar, compile-unit-tests">
        <antcall inheritall="true" inheritrefs="true" target="tests">
           <param name="tests.param" value="**/org/hornetq/tests/integration/spring/*${test-mask}.class"/>
@@ -1655,6 +1684,12 @@
    <target name="distribution-tests" depends="jar, compile-unit-tests">
       <antcall inheritall="true" inheritrefs="true" target="tests">
          <param name="tests.param" value="**/org/hornetq/tests/integration/cluster/distribution/**/*${test-mask}.class"/>
+      </antcall>
+   </target>
+
+    <target name="cluster-tests" depends="jar, compile-unit-tests">
+      <antcall inheritall="true" inheritrefs="true" target="tests">
+         <param name="tests.param" value="**/org/hornetq/tests/integration/cluster/**/*${test-mask}.class"/>
       </antcall>
    </target>
 
@@ -1696,8 +1731,10 @@
              timeout="${junit.timeout}">
          <sysproperty key="user.home" value="${user.home}"/>
          <sysproperty key="java.io.tmpdir" value="${java.io.tmpdir}"/>
-      	 <sysproperty key="twitter.username" value="${twitter.username}"/>
-      	 <sysproperty key="twitter.password" value="${twitter.password}"/>
+         <sysproperty key="twitter.consumerKey" value="${twitter.consumerKey}"/>
+         <sysproperty key="twitter.consumerSecret" value="${twitter.consumerSecret}"/>
+         <sysproperty key="twitter.accessToken" value="${twitter.accessToken}"/>
+         <sysproperty key="twitter.accessTokenSecret" value="${twitter.accessTokenSecret}"/>
       	 <jvmarg value="-Djava.library.path=native/bin"/>
          <jvmarg value="-Dmodule.output=./"/>
          <jvmarg value="-Djava.util.logging.config.file=src/config/trunk/non-clustered/logging.properties"/>
@@ -1718,6 +1755,21 @@
             <fileset dir="${test.classes.dir}">
                <!-- excluded because of https://jira.jboss.org/jira/browse/HORNETQ-65 -->
                <exclude name="**/cluster/failover/*StaticClusterWithBackupFailoverTest.class" />
+
+                  <!--exclude any replication tests for now-->
+                <exclude name="**/cluster/failover/*ClusterWithBackupFailoverTestBase.class"/>
+                <exclude  name="**/cluster/**/*/class"/>
+                <exclude name="**/cluster/failover/*DiscoveryClusterWithBackupFailoverTest.class"/>
+                <exclude name="**/cluster/failover/*GroupingFailoverReplicationTest.class"/>
+                <exclude name="**/cluster/failover/*Replicated*.class"/>
+                <exclude name="**/cluster/replication/**.class"/>
+                <exclude name="**/cluster/failover/*ReplicatedDistributionTest.class"/>
+                <exclude name="**/cluster/failover/*SharedStoreDistributionTest.class"/>
+                <exclude name="**/cluster/failover/*ReplicatedNettyAsynchronousFailoverTest.class"/>
+                <exclude name="**/cluster/*ReplicatedJMSFailoverTest.class"/>
+                <exclude  name="**/integration/replication/*.class"/>
+                <exclude name="**/cluster/failover/Remote*.class"/>
+                <exclude name="**/failover/remote/**.class"/>
                <include name="${tests.param}"/>
             </fileset>
          </batchtest>

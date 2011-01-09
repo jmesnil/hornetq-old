@@ -60,7 +60,7 @@ public interface QueueControl
    /**
     * Returns the number of messages currently in this queue.
     */
-   int getMessageCount();
+   long getMessageCount();
 
    /**
     * Returns the number of scheduled messages in this queue.
@@ -142,7 +142,7 @@ public interface QueueControl
     * Using {@code null} or an empty filter will count <em>all</em> messages from this queue.
     */
    @Operation(desc = "Returns the number of the messages in the queue matching the given filter", impact = MBeanOperationInfo.INFO)
-   int countMessages(@Parameter(name = "filter", desc = "A message filter (can be empty)") String filter) throws Exception;
+   long countMessages(@Parameter(name = "filter", desc = "A message filter (can be empty)") String filter) throws Exception;
 
    /**
     * Removes the message corresponding to the specified message ID.
@@ -281,6 +281,9 @@ public interface QueueControl
     */
    @Operation(desc = "Resumes delivery of queued messages and gets the queue out of paused state.", impact = MBeanOperationInfo.ACTION)
    void resume() throws Exception;
+   
+   @Operation(desc = "List all the existent consumers on the Queue")
+   String listConsumersAsJSON() throws Exception;
 
    /**
     * Returns whether the queue is paused.

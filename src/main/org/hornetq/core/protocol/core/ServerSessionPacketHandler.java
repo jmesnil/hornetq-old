@@ -62,6 +62,7 @@ import org.hornetq.core.protocol.core.impl.wireformat.HornetQExceptionMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.NullResponseMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.RollbackMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.SessionAcknowledgeMessage;
+import org.hornetq.core.protocol.core.impl.wireformat.SessionAddMetaDataMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.SessionBindingQueryMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.SessionBindingQueryResponseMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.SessionConsumerCloseMessage;
@@ -155,6 +156,22 @@ public class ServerSessionPacketHandler implements ChannelHandler
    public long getID()
    {
       return channel.getID();
+   }
+
+   public void connectionFailed(final HornetQException exception, boolean failedOver)
+   {
+      log.warn("Client connection failed, clearing up resources for session " + session.getName());
+
+      try
+      {
+         session.close(true);
+      }
+      catch (Exception e)
+      {
+         log.error("Failed to close session", e);
+      }
+
+      log.warn("Cleared up resources for session " + session.getName());
    }
 
    public void close()
@@ -434,14 +451,14 @@ public class ServerSessionPacketHandler implements ChannelHandler
                case SESS_SEND_LARGE:
                {
                   SessionSendLargeMessage message = (SessionSendLargeMessage)packet;
-                  session.sendLarge(message.getLargeMessageHeader());
+                  session.sendLarge(message.getLargeMessage());
                   break;
                }
                case SESS_SEND_CONTINUATION:
                {
                   SessionSendContinuationMessage message = (SessionSendContinuationMessage)packet;
                   requiresResponse = message.isRequiresResponse();
-                  session.sendContinuations(message.getPacketSize(), message.getBody(), message.isContinues());
+                  session.sendContinuations(message.getPacketSize(), message.getMessageBodySize(), message.getBody(), message.isContinues());
                   if (requiresResponse)
                   {
                      response = new NullResponseMessage();
@@ -458,6 +475,13 @@ public class ServerSessionPacketHandler implements ChannelHandler
                {
                   SessionRequestProducerCreditsMessage message = (SessionRequestProducerCreditsMessage)packet;
                   session.requestProducerCredits(message.getAddress(), message.getCredits());
+                  break;
+               }
+               case PacketImpl.SESS_ADD_METADATA:
+               {
+                  response = new NullResponseMessage();
+                  SessionAddMetaDataMessage message = (SessionAddMetaDataMessage)packet;
+                  session.addMetaData(message.getKey(), message.getData());
                   break;
                }
             }

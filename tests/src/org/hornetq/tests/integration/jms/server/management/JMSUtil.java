@@ -26,20 +26,38 @@ import javax.jms.TopicSubscriber;
 
 import junit.framework.Assert;
 
+import org.hornetq.api.core.HornetQException;
+import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.TransportConfiguration;
+import org.hornetq.api.core.client.ClientSession;
+import org.hornetq.api.core.client.ClusterTopologyListener;
+import org.hornetq.api.core.client.ServerLocator;
+import org.hornetq.api.core.client.SessionFailureListener;
+import org.hornetq.core.client.impl.ClientSessionFactoryInternal;
+import org.hornetq.core.server.HornetQServer;
+import org.hornetq.core.server.cluster.impl.ClusterManagerImpl;
+import org.hornetq.jms.client.HornetQConnection;
 import org.hornetq.jms.client.HornetQConnectionFactory;
+import org.hornetq.jms.client.HornetQJMSConnectionFactory;
 import org.hornetq.api.jms.HornetQJMSClient;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
+import org.hornetq.spi.core.protocol.RemotingConnection;
 import org.hornetq.tests.util.RandomUtil;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A JMSUtil
  *
  * @author <a href="jmesnil@redhat.com">Jeff Mesnil</a>
- * 
- * Created 14 nov. 2008 13:48:08
- *
- *
+ *         <p/>
+ *         Created 14 nov. 2008 13:48:08
  */
 public class JMSUtil
 {
@@ -52,7 +70,8 @@ public class JMSUtil
 
    public static Connection createConnection(final String connectorFactory) throws JMSException
    {
-      HornetQConnectionFactory cf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration(connectorFactory));
+      HornetQJMSConnectionFactory cf = (HornetQJMSConnectionFactory)HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF,
+                                                                                                                      new TransportConfiguration(connectorFactory));
 
       cf.setBlockOnNonDurableSend(true);
       cf.setBlockOnDurableSend(true);
@@ -65,7 +84,8 @@ public class JMSUtil
                                                  final long connectionTTL,
                                                  final long clientFailureCheckPeriod) throws JMSException
    {
-      HornetQConnectionFactory cf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration(connectorFactory));
+      HornetQJMSConnectionFactory cf = (HornetQJMSConnectionFactory)HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF,
+                                                                                                                      new TransportConfiguration(connectorFactory));
 
       cf.setBlockOnNonDurableSend(true);
       cf.setBlockOnDurableSend(true);
@@ -76,18 +96,16 @@ public class JMSUtil
       return cf;
    }
 
-   static MessageConsumer createConsumer(final Connection connection,
-                                         final Destination destination,
-                                         final String connectorFactory) throws JMSException
+   static MessageConsumer createConsumer(final Connection connection, final Destination destination) throws JMSException
    {
-      Session s = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-
-      return s.createConsumer(destination);
+      return createConsumer(connection, destination, Session.AUTO_ACKNOWLEDGE);
    }
 
-   public static MessageConsumer createConsumer(final Connection connection, final Destination destination) throws JMSException
+   static MessageConsumer createConsumer(final Connection connection, final Destination destination, int ackMode) throws JMSException
    {
-      return JMSUtil.createConsumer(connection, destination, InVMConnectorFactory.class.getName());
+      Session s = connection.createSession(false, ackMode);
+
+      return s.createConsumer(destination);
    }
 
    static TopicSubscriber createDurableSubscriber(final Connection connection,
@@ -95,15 +113,25 @@ public class JMSUtil
                                                   final String clientID,
                                                   final String subscriptionName) throws JMSException
    {
+      return createDurableSubscriber(connection, topic, clientID, subscriptionName, Session.AUTO_ACKNOWLEDGE);
+   }
+
+   static TopicSubscriber createDurableSubscriber(final Connection connection,
+                                                  final Topic topic,
+                                                  final String clientID,
+                                                  final String subscriptionName,
+                                                  final int ackMode) throws JMSException
+   {
       connection.setClientID(clientID);
-      Session s = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+      Session s = connection.createSession(false, ackMode);
 
       return s.createDurableSubscriber(topic, subscriptionName);
    }
 
    public static String[] sendMessages(final Destination destination, final int messagesToSend) throws Exception
    {
-      HornetQConnectionFactory cf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      HornetQJMSConnectionFactory cf = (HornetQJMSConnectionFactory)HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF,
+                                                                                                                      new TransportConfiguration(InVMConnectorFactory.class.getName()));
       return JMSUtil.sendMessages(cf, destination, messagesToSend);
    }
 
@@ -170,6 +198,54 @@ public class JMSUtil
       }
    }
 
+   public static void waitForServer(HornetQServer server) throws InterruptedException
+   {
+      long timetowait = System.currentTimeMillis() + 5000;
+      while (!server.isStarted())
+      {
+         Thread.sleep(100);
+         if (server.isStarted())
+         {
+            break;
+         }
+         else if (System.currentTimeMillis() > timetowait)
+         {
+            throw new IllegalStateException("server didnt start");
+         }
+      }
+   }
+
+   public static void crash(HornetQServer server, ClientSession... sessions) throws Exception
+   {
+      final CountDownLatch latch = new CountDownLatch(sessions.length);
+
+      class MyListener implements SessionFailureListener
+      {
+         public void connectionFailed(final HornetQException me, boolean failedOver)
+         {
+            latch.countDown();
+         }
+
+         public void beforeReconnect(HornetQException exception)
+         {
+            System.out.println("MyListener.beforeReconnect");
+         }
+      }
+      for (ClientSession session : sessions)
+      {
+         session.addFailureListener(new MyListener());
+      }
+
+      ClusterManagerImpl clusterManager = (ClusterManagerImpl)server.getClusterManager();
+      clusterManager.clear();
+      server.stop(true);
+
+      // Wait to be informed of failure
+      boolean ok = latch.await(10000, TimeUnit.MILLISECONDS);
+
+      Assert.assertTrue(ok);
+   }
+
    // Constructors --------------------------------------------------
 
    // Public --------------------------------------------------------
@@ -182,4 +258,63 @@ public class JMSUtil
 
    // Inner classes -------------------------------------------------
 
+   public static HornetQConnection createConnectionAndWaitForTopology(HornetQConnectionFactory factory,
+                                                                      int topologyMembers,
+                                                                      int timeout) throws Exception
+   {
+      HornetQConnection conn;
+      CountDownLatch countDownLatch = new CountDownLatch(topologyMembers);
+
+      ServerLocator locator = factory.getServerLocator();
+
+      locator.addClusterTopologyListener(new LatchClusterTopologyListener(countDownLatch));
+
+      conn = (HornetQConnection)factory.createConnection();
+
+      boolean ok = countDownLatch.await(timeout, TimeUnit.SECONDS);
+      if (!ok)
+      {
+         throw new IllegalStateException("timed out waiting for topology");
+      }
+      return conn;
+   }
+
+   static class LatchClusterTopologyListener implements ClusterTopologyListener
+   {
+      final CountDownLatch latch;
+
+      int liveNodes = 0;
+
+      int backUpNodes = 0;
+
+      List<String> liveNode = new ArrayList<String>();
+
+      List<String> backupNode = new ArrayList<String>();
+
+      public LatchClusterTopologyListener(CountDownLatch latch)
+      {
+         this.latch = latch;
+      }
+
+      public void nodeUP(String nodeID,
+                         Pair<TransportConfiguration, TransportConfiguration> connectorPair,
+                         boolean last)
+      {
+         if (connectorPair.a != null && !liveNode.contains(connectorPair.a.getName()))
+         {
+            liveNode.add(connectorPair.a.getName());
+            latch.countDown();
+         }
+         if (connectorPair.b != null && !backupNode.contains(connectorPair.b.getName()))
+         {
+            backupNode.add(connectorPair.b.getName());
+            latch.countDown();
+         }
+      }
+
+      public void nodeDown(String nodeID)
+      {
+         // To change body of implemented methods use File | Settings | File Templates.
+      }
+   }
 }

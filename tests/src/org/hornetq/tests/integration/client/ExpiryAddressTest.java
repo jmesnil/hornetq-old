@@ -19,24 +19,27 @@ import org.hornetq.api.core.Message;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.*;
+import org.hornetq.core.config.Configuration;
 import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.HornetQServers;
 import org.hornetq.core.settings.impl.AddressSettings;
 import org.hornetq.tests.util.RandomUtil;
+import org.hornetq.tests.util.ServiceTestBase;
 import org.hornetq.tests.util.UnitTestCase;
 
 /**
  * @author <a href="mailto:andy.taylor@jboss.org">Andy Taylor</a>
  */
-public class ExpiryAddressTest extends UnitTestCase
+public class ExpiryAddressTest extends ServiceTestBase
 {
    private static final Logger log = Logger.getLogger(ExpiryAddressTest.class);
 
    private HornetQServer server;
 
    private ClientSession clientSession;
+   private ServerLocator locator;
 
    public void testBasicSend() throws Exception
    {
@@ -154,7 +157,10 @@ public class ExpiryAddressTest extends UnitTestCase
       SimpleString eq = new SimpleString("EA1");
       clientSession.createQueue(ea, eq, null, false);
       clientSession.createQueue(qName, qName, null, false);
-      ClientSessionFactory sessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      ClientSessionFactory sessionFactory = locator.createSessionFactory();
+
       ClientSession sendSession = sessionFactory.createSession(false, true, true);
       ClientProducer producer = sendSession.createProducer(qName);
 
@@ -189,6 +195,8 @@ public class ExpiryAddressTest extends UnitTestCase
       }
 
       sendSession.close();
+
+      locator.close();
 
    }
 
@@ -298,7 +306,7 @@ public class ExpiryAddressTest extends UnitTestCase
    {
       super.setUp();
 
-      ConfigurationImpl configuration = new ConfigurationImpl();
+      Configuration configuration = createDefaultConfig();
       configuration.setSecurityEnabled(false);
       TransportConfiguration transportConfig = new TransportConfiguration(UnitTestCase.INVM_ACCEPTOR_FACTORY);
       configuration.getAcceptorConfigurations().add(transportConfig);
@@ -306,8 +314,11 @@ public class ExpiryAddressTest extends UnitTestCase
       // start the server
       server.start();
       // then we create a client as normal
-      ClientSessionFactory sessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
-      sessionFactory.setBlockOnAcknowledge(true); // There are assertions over sizes that needs to be done after the ACK
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      locator.setBlockOnAcknowledge(true); 
+      ClientSessionFactory sessionFactory = locator.createSessionFactory();
+// There are assertions over sizes that needs to be done after the ACK
       // was received on server
       clientSession = sessionFactory.createSession(null, null, false, true, true, false, 0);
    }
@@ -337,6 +348,7 @@ public class ExpiryAddressTest extends UnitTestCase
             //
          }
       }
+      locator.close();
       server = null;
       clientSession = null;
 

@@ -15,6 +15,7 @@ package org.hornetq.core.server;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
 
 import javax.management.MBeanServer;
 
@@ -135,9 +136,13 @@ public interface HornetQServer extends HornetQComponent
                      SimpleString filterString,
                      boolean durable,
                      boolean temporary) throws Exception;
+   
+   Queue locateQueue(SimpleString queueName) throws Exception;
 
    void destroyQueue(SimpleString queueName, ServerSession session) throws Exception;
 
+   ScheduledExecutorService getScheduledPool();
+   
    ExecutorFactory getExecutorFactory();
 
    void setGroupingHandler(GroupingHandler groupingHandler);
@@ -159,4 +164,8 @@ public interface HornetQServer extends HornetQComponent
    void deployBridge(BridgeConfiguration config) throws Exception;
 
    void destroyBridge(String name) throws Exception;
+
+   ServerSession getSessionByID(String sessionID);
+
+   void stop(boolean failoverOnServerShutdown) throws Exception;
 }

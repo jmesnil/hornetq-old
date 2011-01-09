@@ -24,6 +24,7 @@ import org.hornetq.api.core.client.ClientProducer;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.core.config.Configuration;
 import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.logging.Logger;
@@ -54,6 +55,8 @@ public class DirectDeliverTest extends ServiceTestBase
    // Attributes ----------------------------------------------------
 
    private HornetQServer server;
+   
+   private ServerLocator locator;
 
    // Static --------------------------------------------------------
 
@@ -75,17 +78,21 @@ public class DirectDeliverTest extends ServiceTestBase
 
       TransportConfiguration tc = new TransportConfiguration(NettyAcceptorFactory.class.getName(), params);
 
-      Configuration config = new ConfigurationImpl();
+      Configuration config = createBasicConfig();
       config.getAcceptorConfigurations().add(tc);
 
       config.setSecurityEnabled(false);
       server = createServer(false, config);
       server.start();
+      
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(NettyConnectorFactory.class.getName()));
    }
 
    @Override
    protected void tearDown() throws Exception
    {
+      locator.close();
+      
       server.stop();
 
       server = null;
@@ -93,11 +100,9 @@ public class DirectDeliverTest extends ServiceTestBase
       super.tearDown();
    }
 
-   protected ClientSessionFactory createSessionFactory()
+   protected ClientSessionFactory createSessionFactory() throws Exception
    {
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration(NettyConnectorFactory.class.getName()));
-
-      return sf;
+      return locator.createSessionFactory();
    }
 
    public void testDirectDeliver() throws Exception

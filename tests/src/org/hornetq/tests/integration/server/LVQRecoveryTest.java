@@ -46,6 +46,7 @@ public class LVQRecoveryTest extends ServiceTestBase
    private Configuration configuration;
 
    private AddressSettings qs;
+   private ServerLocator locator;
 
    public void testMultipleMessagesAfterRecovery() throws Exception
    {
@@ -180,6 +181,10 @@ public class LVQRecoveryTest extends ServiceTestBase
             //
          }
       }
+      if(locator != null)
+      {
+         locator.close();
+      }
       if (server != null && server.isStarted())
       {
          try
@@ -213,9 +218,11 @@ public class LVQRecoveryTest extends ServiceTestBase
       qs.setLastValueQueue(true);
       server.getAddressSettingsRepository().addMatch(address.toString(), qs);
       // then we create a client as normal
-      ClientSessionFactory sessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
-      sessionFactory.setBlockOnAcknowledge(true);
-      sessionFactory.setAckBatchSize(0);
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      locator.setBlockOnAcknowledge(true);
+      locator.setAckBatchSize(0);
+      ClientSessionFactory sessionFactory = locator.createSessionFactory();
       clientSession = sessionFactory.createSession(false, true, true);
       clientSessionXa = sessionFactory.createSession(true, false, false);
       clientSession.createQueue(address, qName1, null, true);
@@ -234,9 +241,12 @@ public class LVQRecoveryTest extends ServiceTestBase
       qs.setLastValueQueue(true);
       server.getAddressSettingsRepository().addMatch(address.toString(), qs);
       // then we create a client as normal
-      ClientSessionFactory sessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
-      sessionFactory.setBlockOnAcknowledge(true);
-      sessionFactory.setAckBatchSize(0);
+      locator.close();
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      locator.setBlockOnAcknowledge(true);
+      locator.setAckBatchSize(0);
+      ClientSessionFactory sessionFactory = locator.createSessionFactory();
       clientSession = sessionFactory.createSession(false, true, true);
       clientSessionXa = sessionFactory.createSession(true, false, false);
    }

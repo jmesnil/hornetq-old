@@ -40,12 +40,14 @@ import org.hornetq.core.journal.JournalLoadInformation;
 import org.hornetq.core.journal.SequentialFile;
 import org.hornetq.core.journal.SequentialFileFactory;
 import org.hornetq.core.journal.impl.NIOSequentialFileFactory;
+import org.hornetq.core.message.impl.MessageInternal;
 import org.hornetq.core.paging.Page;
 import org.hornetq.core.paging.PageTransactionInfo;
 import org.hornetq.core.paging.PagedMessage;
 import org.hornetq.core.paging.PagingManager;
 import org.hornetq.core.paging.PagingStore;
 import org.hornetq.core.paging.PagingStoreFactory;
+import org.hornetq.core.paging.cursor.PagePosition;
 import org.hornetq.core.paging.impl.PageTransactionInfoImpl;
 import org.hornetq.core.paging.impl.PagingStoreImpl;
 import org.hornetq.core.paging.impl.TestSupportPageStore;
@@ -63,6 +65,7 @@ import org.hornetq.core.server.MessageReference;
 import org.hornetq.core.server.Queue;
 import org.hornetq.core.server.ServerMessage;
 import org.hornetq.core.server.group.impl.GroupBinding;
+import org.hornetq.core.server.impl.RoutingContextImpl;
 import org.hornetq.core.server.impl.ServerMessageImpl;
 import org.hornetq.core.settings.HierarchicalRepository;
 import org.hornetq.core.settings.impl.AddressFullMessagePolicy;
@@ -72,7 +75,7 @@ import org.hornetq.tests.unit.core.journal.impl.fakes.FakeSequentialFileFactory;
 import org.hornetq.tests.unit.core.server.impl.fakes.FakePostOffice;
 import org.hornetq.tests.util.RandomUtil;
 import org.hornetq.tests.util.UnitTestCase;
-import org.hornetq.utils.UUID;
+import org.hornetq.utils.ExecutorFactory;
 
 /**
  * 
@@ -135,6 +138,8 @@ public class PagingStoreImplTest extends UnitTestCase
       addressSettings.setAddressFullMessagePolicy(AddressFullMessagePolicy.PAGE);
 
       PagingStore storeImpl = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                                  null,
+                                                  100,
                                                   createMockManager(),
                                                   createStorageManagerMock(),
                                                   createPostOfficeMock(),
@@ -142,7 +147,7 @@ public class PagingStoreImplTest extends UnitTestCase
                                                   null,
                                                   PagingStoreImplTest.destinationTestName,
                                                   addressSettings,
-                                                  executor,
+                                                  getExecutorFactory(),
                                                   true);
 
       storeImpl.start();
@@ -171,6 +176,8 @@ public class PagingStoreImplTest extends UnitTestCase
       AddressSettings addressSettings = new AddressSettings();
       addressSettings.setAddressFullMessagePolicy(AddressFullMessagePolicy.PAGE);
       TestSupportPageStore storeImpl = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                                           null,
+                                                           100,
                                                            createMockManager(),
                                                            createStorageManagerMock(),
                                                            createPostOfficeMock(),
@@ -178,7 +185,7 @@ public class PagingStoreImplTest extends UnitTestCase
                                                            storeFactory,
                                                            PagingStoreImplTest.destinationTestName,
                                                            addressSettings,
-                                                           executor,
+                                                           getExecutorFactory(),
                                                            true);
 
       storeImpl.start();
@@ -200,13 +207,15 @@ public class PagingStoreImplTest extends UnitTestCase
 
       Assert.assertTrue(storeImpl.isPaging());
 
-      Assert.assertTrue(storeImpl.page(msg));
+      Assert.assertTrue(storeImpl.page(msg, new RoutingContextImpl(null)));
 
       Assert.assertEquals(1, storeImpl.getNumberOfPages());
 
       storeImpl.sync();
 
       storeImpl = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                      null,
+                                      100,
                                       createMockManager(),
                                       createStorageManagerMock(),
                                       createPostOfficeMock(),
@@ -214,12 +223,12 @@ public class PagingStoreImplTest extends UnitTestCase
                                       null,
                                       PagingStoreImplTest.destinationTestName,
                                       addressSettings,
-                                      executor,
+                                      getExecutorFactory(),
                                       true);
 
       storeImpl.start();
 
-      Assert.assertEquals(2, storeImpl.getNumberOfPages());
+      Assert.assertEquals(1, storeImpl.getNumberOfPages());
 
    }
 
@@ -234,6 +243,8 @@ public class PagingStoreImplTest extends UnitTestCase
       AddressSettings addressSettings = new AddressSettings();
       addressSettings.setAddressFullMessagePolicy(AddressFullMessagePolicy.PAGE);
       TestSupportPageStore storeImpl = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                                           null,
+                                                           100,
                                                            createMockManager(),
                                                            createStorageManagerMock(),
                                                            createPostOfficeMock(),
@@ -241,7 +252,7 @@ public class PagingStoreImplTest extends UnitTestCase
                                                            storeFactory,
                                                            PagingStoreImplTest.destinationTestName,
                                                            addressSettings,
-                                                           executor,
+                                                           getExecutorFactory(),
                                                            true);
 
       storeImpl.start();
@@ -263,7 +274,7 @@ public class PagingStoreImplTest extends UnitTestCase
 
          ServerMessage msg = createMessage(i, storeImpl, destination, buffer);
 
-         Assert.assertTrue(storeImpl.page(msg));
+         Assert.assertTrue(storeImpl.page(msg, new RoutingContextImpl(null)));
       }
 
       Assert.assertEquals(1, storeImpl.getNumberOfPages());
@@ -288,7 +299,7 @@ public class PagingStoreImplTest extends UnitTestCase
       for (int i = 0; i < numMessages; i++)
       {
          HornetQBuffer horn1 = buffers.get(i);
-         HornetQBuffer horn2 = msg.get(i).getMessage(null).getBodyBuffer();
+         HornetQBuffer horn2 = msg.get(i).getMessage().getBodyBuffer();
          horn1.resetReaderIndex();
          horn2.resetReaderIndex();
          for (int j = 0; j < horn1.writerIndex(); j++)
@@ -309,6 +320,8 @@ public class PagingStoreImplTest extends UnitTestCase
       AddressSettings addressSettings = new AddressSettings();
       addressSettings.setAddressFullMessagePolicy(AddressFullMessagePolicy.PAGE);
       TestSupportPageStore storeImpl = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                                           null,
+                                                           100,
                                                            createMockManager(),
                                                            createStorageManagerMock(),
                                                            createPostOfficeMock(),
@@ -316,7 +329,7 @@ public class PagingStoreImplTest extends UnitTestCase
                                                            storeFactory,
                                                            PagingStoreImplTest.destinationTestName,
                                                            addressSettings,
-                                                           executor,
+                                                           getExecutorFactory(),
                                                            true);
 
       storeImpl.start();
@@ -343,7 +356,7 @@ public class PagingStoreImplTest extends UnitTestCase
 
          ServerMessage msg = createMessage(i, storeImpl, destination, buffer);
 
-         Assert.assertTrue(storeImpl.page(msg));
+         Assert.assertTrue(storeImpl.page(msg, new RoutingContextImpl(null)));
       }
 
       Assert.assertEquals(2, storeImpl.getNumberOfPages());
@@ -356,6 +369,8 @@ public class PagingStoreImplTest extends UnitTestCase
       {
          Page page = storeImpl.depage();
 
+         System.out.println("numberOfPages = " + storeImpl.getNumberOfPages());
+
          page.open();
 
          List<PagedMessage> msg = page.read();
@@ -366,10 +381,8 @@ public class PagingStoreImplTest extends UnitTestCase
 
          for (int i = 0; i < 5; i++)
          {
-            Assert.assertEquals(sequence++, msg.get(i).getMessage(null).getMessageID());
-            UnitTestCase.assertEqualsBuffers(18, buffers.get(pageNr * 5 + i), msg.get(i)
-                                                                                 .getMessage(null)
-                                                                                 .getBodyBuffer());
+            Assert.assertEquals(sequence++, msg.get(i).getMessage().getMessageID());
+            UnitTestCase.assertEqualsBuffers(18, buffers.get(pageNr * 5 + i), msg.get(i).getMessage().getBodyBuffer());
          }
       }
 
@@ -379,7 +392,7 @@ public class PagingStoreImplTest extends UnitTestCase
 
       ServerMessage msg = createMessage(1, storeImpl, destination, buffers.get(0));
 
-      Assert.assertTrue(storeImpl.page(msg));
+      Assert.assertTrue(storeImpl.page(msg, new RoutingContextImpl(null)));
 
       Page newPage = storeImpl.depage();
 
@@ -397,11 +410,11 @@ public class PagingStoreImplTest extends UnitTestCase
 
       Assert.assertFalse(storeImpl.isPaging());
 
-      Assert.assertFalse(storeImpl.page(msg));
+      Assert.assertFalse(storeImpl.page(msg, new RoutingContextImpl(null)));
 
       storeImpl.startPaging();
 
-      Assert.assertTrue(storeImpl.page(msg));
+      Assert.assertTrue(storeImpl.page(msg, new RoutingContextImpl(null)));
 
       Page page = storeImpl.depage();
 
@@ -411,9 +424,9 @@ public class PagingStoreImplTest extends UnitTestCase
 
       Assert.assertEquals(1, msgs.size());
 
-      Assert.assertEquals(1l, msgs.get(0).getMessage(null).getMessageID());
+      Assert.assertEquals(1l, msgs.get(0).getMessage().getMessageID());
 
-      UnitTestCase.assertEqualsBuffers(18, buffers.get(0), msgs.get(0).getMessage(null).getBodyBuffer());
+      UnitTestCase.assertEqualsBuffers(18, buffers.get(0), msgs.get(0).getMessage().getBodyBuffer());
 
       Assert.assertEquals(1, storeImpl.getNumberOfPages());
 
@@ -456,6 +469,8 @@ public class PagingStoreImplTest extends UnitTestCase
       settings.setAddressFullMessagePolicy(AddressFullMessagePolicy.PAGE);
 
       final TestSupportPageStore storeImpl = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                                                 null,
+                                                                 100,
                                                                  createMockManager(),
                                                                  createStorageManagerMock(),
                                                                  createPostOfficeMock(),
@@ -463,7 +478,7 @@ public class PagingStoreImplTest extends UnitTestCase
                                                                  storeFactory,
                                                                  new SimpleString("test"),
                                                                  settings,
-                                                                 executor,
+                                                                 getExecutorFactory(),
                                                                  true);
 
       storeImpl.start();
@@ -497,7 +512,7 @@ public class PagingStoreImplTest extends UnitTestCase
                   // This is possible because the depage thread is not actually reading the pages.
                   // Just using the internal API to remove it from the page file system
                   ServerMessage msg = createMessage(id, storeImpl, destination, createRandomBuffer(id, 5));
-                  if (storeImpl.page(msg))
+                  if (storeImpl.page(msg, new RoutingContextImpl(null)))
                   {
                      buffers.put(id, msg);
                   }
@@ -592,14 +607,14 @@ public class PagingStoreImplTest extends UnitTestCase
 
          for (PagedMessage msg : msgs)
          {
-            long id = msg.getMessage(null).getBodyBuffer().readLong();
-            msg.getMessage(null).getBodyBuffer().resetReaderIndex();
+            long id = msg.getMessage().getBodyBuffer().readLong();
+            msg.getMessage().getBodyBuffer().resetReaderIndex();
 
             ServerMessage msgWritten = buffers.remove(id);
-            buffers2.put(id, msg.getMessage(null));
+            buffers2.put(id, msg.getMessage());
             Assert.assertNotNull(msgWritten);
-            Assert.assertEquals(msg.getMessage(null).getAddress(), msgWritten.getAddress());
-            UnitTestCase.assertEqualsBuffers(10, msgWritten.getBodyBuffer(), msg.getMessage(null).getBodyBuffer());
+            Assert.assertEquals(msg.getMessage().getAddress(), msgWritten.getAddress());
+            UnitTestCase.assertEqualsBuffers(10, msgWritten.getBodyBuffer(), msg.getMessage().getBodyBuffer());
          }
       }
 
@@ -619,6 +634,8 @@ public class PagingStoreImplTest extends UnitTestCase
       }
 
       TestSupportPageStore storeImpl2 = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                                            null,
+                                                            100,
                                                             createMockManager(),
                                                             createStorageManagerMock(),
                                                             createPostOfficeMock(),
@@ -626,7 +643,7 @@ public class PagingStoreImplTest extends UnitTestCase
                                                             storeFactory,
                                                             new SimpleString("test"),
                                                             settings,
-                                                            executor,
+                                                            getExecutorFactory(),
                                                             true);
       storeImpl2.start();
 
@@ -642,7 +659,9 @@ public class PagingStoreImplTest extends UnitTestCase
       long lastMessageId = messageIdGenerator.incrementAndGet();
       ServerMessage lastMsg = createMessage(lastMessageId, storeImpl, destination, createRandomBuffer(lastMessageId, 5));
 
-      storeImpl2.page(lastMsg);
+      storeImpl2.forceAnotherPage();
+
+      storeImpl2.page(lastMsg, new RoutingContextImpl(null));
       buffers2.put(lastMessageId, lastMsg);
 
       Page lastPage = null;
@@ -665,13 +684,13 @@ public class PagingStoreImplTest extends UnitTestCase
          for (PagedMessage msg : msgs)
          {
 
-            long id = msg.getMessage(null).getBodyBuffer().readLong();
+            long id = msg.getMessage().getBodyBuffer().readLong();
             ServerMessage msgWritten = buffers2.remove(id);
             Assert.assertNotNull(msgWritten);
-            Assert.assertEquals(msg.getMessage(null).getAddress(), msgWritten.getAddress());
+            Assert.assertEquals(msg.getMessage().getAddress(), msgWritten.getAddress());
             UnitTestCase.assertEqualsByteArrays(msgWritten.getBodyBuffer().writerIndex(),
                                                 msgWritten.getBodyBuffer().toByteBuffer().array(),
-                                                msg.getMessage(null).getBodyBuffer().toByteBuffer().array());
+                                                msg.getMessage().getBodyBuffer().toByteBuffer().array());
          }
       }
 
@@ -680,12 +699,54 @@ public class PagingStoreImplTest extends UnitTestCase
       lastPage.close();
       Assert.assertEquals(1, lastMessages.size());
 
-      lastMessages.get(0).getMessage(null).getBodyBuffer().resetReaderIndex();
-      Assert.assertEquals(lastMessages.get(0).getMessage(null).getBodyBuffer().readLong(), lastMessageId);
+      lastMessages.get(0).getMessage().getBodyBuffer().resetReaderIndex();
+      Assert.assertEquals(lastMessages.get(0).getMessage().getBodyBuffer().readLong(), lastMessageId);
 
       Assert.assertEquals(0, buffers2.size());
 
       Assert.assertEquals(0, storeImpl.getAddressSize());
+   }
+
+   public void testRestartPage() throws Throwable
+   {
+      clearData();
+      SequentialFileFactory factory = new NIOSequentialFileFactory(this.getPageDir());
+
+      PagingStoreFactory storeFactory = new FakeStoreFactory(factory);
+
+      final int MAX_SIZE = 1024 * 10;
+
+      AddressSettings settings = new AddressSettings();
+      settings.setPageSizeBytes(MAX_SIZE);
+      settings.setAddressFullMessagePolicy(AddressFullMessagePolicy.PAGE);
+
+      final TestSupportPageStore storeImpl = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                                                 null,
+                                                                 100,
+                                                                 createMockManager(),
+                                                                 createStorageManagerMock(),
+                                                                 createPostOfficeMock(),
+                                                                 factory,
+                                                                 storeFactory,
+                                                                 new SimpleString("test"),
+                                                                 settings,
+                                                                 getExecutorFactory(),
+                                                                 true);
+
+      storeImpl.start();
+
+      Assert.assertEquals(0, storeImpl.getNumberOfPages());
+
+      // Marked the store to be paged
+      storeImpl.startPaging();
+
+      storeImpl.depage();
+
+      assertNull(storeImpl.getCurrentPage());
+
+      storeImpl.startPaging();
+
+      assertNotNull(storeImpl.getCurrentPage());
    }
 
    public void testOrderOnPaging() throws Throwable
@@ -702,6 +763,8 @@ public class PagingStoreImplTest extends UnitTestCase
       settings.setAddressFullMessagePolicy(AddressFullMessagePolicy.PAGE);
 
       final TestSupportPageStore storeImpl = new PagingStoreImpl(PagingStoreImplTest.destinationTestName,
+                                                                 null,
+                                                                 100,
                                                                  createMockManager(),
                                                                  createStorageManagerMock(),
                                                                  createPostOfficeMock(),
@@ -709,8 +772,8 @@ public class PagingStoreImplTest extends UnitTestCase
                                                                  storeFactory,
                                                                  new SimpleString("test"),
                                                                  settings,
-                                                                 executor,
-                                                                 true);
+                                                                 getExecutorFactory(),
+                                                                 false);
 
       storeImpl.start();
 
@@ -750,7 +813,7 @@ public class PagingStoreImplTest extends UnitTestCase
                   // Just using the internal API to remove it from the page file system
                   ServerMessage msg = createMessage(i, storeImpl, destination, createRandomBuffer(i, 1024));
                   msg.putLongProperty("count", i);
-                  while (!storeImpl.page(msg))
+                  while (!storeImpl.page(msg, new RoutingContextImpl(null)))
                   {
                      storeImpl.startPaging();
                   }
@@ -791,22 +854,22 @@ public class PagingStoreImplTest extends UnitTestCase
                   {
                      page.open();
                      List<PagedMessage> messages = page.read();
- 
+
                      for (PagedMessage pgmsg : messages)
                      {
-                        ServerMessage msg = pgmsg.getMessage(null);
+                        ServerMessage msg = pgmsg.getMessage();
 
                         assertEquals(msgsRead++, msg.getMessageID());
 
                         assertEquals(msg.getMessageID(), msg.getLongProperty("count").longValue());
                      }
- 
+
                      page.close();
                      page.delete();
                   }
                   else
                   {
-                     System.out.println("Depaged!!!!");
+                     System.out.println("Depaged!!!! numerOfMessages = " + msgsRead + " of " + NUMBER_OF_MESSAGES);
                      Thread.sleep(500);
                   }
                }
@@ -830,7 +893,7 @@ public class PagingStoreImplTest extends UnitTestCase
 
       storeImpl.stop();
 
-      for (Throwable e: errors)
+      for (Throwable e : errors)
       {
          throw e;
       }
@@ -854,6 +917,18 @@ public class PagingStoreImplTest extends UnitTestCase
       return new FakePostOffice();
    }
 
+   private ExecutorFactory getExecutorFactory()
+   {
+      return new ExecutorFactory()
+      {
+
+         public Executor getExecutor()
+         {
+            return executor;
+         }
+      };
+   }
+
    private ServerMessage createMessage(final long id,
                                        final PagingStore store,
                                        final SimpleString destination,
@@ -873,18 +948,9 @@ public class PagingStoreImplTest extends UnitTestCase
       return msg;
    }
 
-   private HornetQBuffer createRandomBuffer(final long id, final int size)
+   protected HornetQBuffer createRandomBuffer(final long id, final int size)
    {
-      HornetQBuffer buffer = HornetQBuffers.fixedBuffer(size + 8);
-
-      buffer.writeLong(id);
-
-      for (int j = 8; j < buffer.capacity(); j++)
-      {
-         buffer.writeByte((byte)66);
-      }
-
-      return buffer;
+      return RandomUtil.randomBuffer(size, id);
    }
 
    // Protected ----------------------------------------------------
@@ -1035,6 +1101,15 @@ public class PagingStoreImplTest extends UnitTestCase
          return null;
       }
 
+      /* (non-Javadoc)
+       * @see org.hornetq.core.paging.PagingManager#processReload()
+       */
+      public void processReload()
+      {
+         // TODO Auto-generated method stub
+
+      }
+
    }
 
    class FakeStorageManager implements StorageManager
@@ -1125,14 +1200,6 @@ public class PagingStoreImplTest extends UnitTestCase
       }
 
       /* (non-Javadoc)
-       * @see org.hornetq.core.persistence.StorageManager#getPersistentID()
-       */
-      public UUID getPersistentID()
-      {
-         return null;
-      }
-
-      /* (non-Javadoc)
        * @see org.hornetq.core.persistence.StorageManager#loadBindingJournal(java.util.List)
        */
       public JournalLoadInformation loadBindingJournal(final List<QueueBindingInfo> queueBindingInfos,
@@ -1162,6 +1229,7 @@ public class PagingStoreImplTest extends UnitTestCase
                                                        final PagingManager pagingManager,
                                                        final ResourceManager resourceManager,
                                                        final Map<Long, Queue> queues,
+                                                       Map<Long, QueueBindingInfo> queueInfos,
                                                        final Map<SimpleString, List<Pair<byte[], Long>>> duplicateIDMap) throws Exception
       {
          return new JournalLoadInformation();
@@ -1178,13 +1246,6 @@ public class PagingStoreImplTest extends UnitTestCase
        * @see org.hornetq.core.persistence.StorageManager#rollback(long)
        */
       public void rollback(final long txID) throws Exception
-      {
-      }
-
-      /* (non-Javadoc)
-       * @see org.hornetq.core.persistence.StorageManager#setPersistentID(org.hornetq.utils.UUID)
-       */
-      public void setPersistentID(final UUID id) throws Exception
       {
       }
 
@@ -1343,7 +1404,7 @@ public class PagingStoreImplTest extends UnitTestCase
       /* (non-Javadoc)
        * @see org.hornetq.core.persistence.StorageManager#createLargeMessage(byte[])
        */
-      public LargeServerMessage createLargeMessage(final long messageId, final byte[] header)
+      public LargeServerMessage createLargeMessage(final long messageId, final MessageInternal msg)
       {
 
          return null;
@@ -1510,6 +1571,87 @@ public class PagingStoreImplTest extends UnitTestCase
       {
       }
 
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#storeCursorAcknowledge(long, org.hornetq.core.paging.cursor.PagePosition)
+       */
+      public void storeCursorAcknowledge(long queueID, PagePosition position)
+      {
+         // TODO Auto-generated method stub
+
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#storeCursorAcknowledgeTransactional(long, long, org.hornetq.core.paging.cursor.PagePosition)
+       */
+      public void storeCursorAcknowledgeTransactional(long txID, long queueID, PagePosition position)
+      {
+         // TODO Auto-generated method stub
+
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#deleteCursorAcknowledgeTransactional(long, long)
+       */
+      public void deleteCursorAcknowledgeTransactional(long txID, long ackID) throws Exception
+      {
+         // TODO Auto-generated method stub
+
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#updatePageTransaction(org.hornetq.core.paging.PageTransactionInfo, int)
+       */
+      public void updatePageTransaction(PageTransactionInfo pageTransaction, int depage) throws Exception
+      {
+         // TODO Auto-generated method stub
+
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#storePageCounter(long, long, long)
+       */
+      public long storePageCounter(long txID, long queueID, long value) throws Exception
+      {
+         // TODO Auto-generated method stub
+         return 0;
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#deleteIncrementRecord(long, long)
+       */
+      public void deleteIncrementRecord(long txID, long recordID) throws Exception
+      {
+         // TODO Auto-generated method stub
+
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#deletePageCounter(long, long)
+       */
+      public void deletePageCounter(long txID, long recordID) throws Exception
+      {
+         // TODO Auto-generated method stub
+
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#storePageCounterInc(long, long, int)
+       */
+      public long storePageCounterInc(long txID, long queueID, int add) throws Exception
+      {
+         // TODO Auto-generated method stub
+         return 0;
+      }
+
+      /* (non-Javadoc)
+       * @see org.hornetq.core.persistence.StorageManager#storePageCounterInc(long, int)
+       */
+      public long storePageCounterInc(long queueID, int add) throws Exception
+      {
+         // TODO Auto-generated method stub
+         return 0;
+      }
+
    }
 
    class FakeStoreFactory implements PagingStoreFactory
@@ -1546,7 +1688,7 @@ public class PagingStoreImplTest extends UnitTestCase
       /* (non-Javadoc)
        * @see org.hornetq.core.paging.PagingStoreFactory#newStore(org.hornetq.utils.SimpleString, org.hornetq.core.settings.impl.AddressSettings)
        */
-      public PagingStore newStore(final SimpleString destinationName, final AddressSettings addressSettings) throws Exception
+      public PagingStore newStore(final SimpleString destinationName, final AddressSettings addressSettings)
       {
          return null;
       }

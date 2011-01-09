@@ -53,6 +53,7 @@ public class NotificationTest extends UnitTestCase
    private ClientConsumer notifConsumer;
 
    private SimpleString notifQueue;
+   private ServerLocator locator;
 
    // Static --------------------------------------------------------
 
@@ -207,7 +208,7 @@ public class NotificationTest extends UnitTestCase
    {
       super.setUp();
 
-      Configuration conf = new ConfigurationImpl();
+      Configuration conf = createBasicConfig();
       conf.setSecurityEnabled(false);
       // the notifications are independent of JMX
       conf.setJMXManagementEnabled(false);
@@ -215,7 +216,8 @@ public class NotificationTest extends UnitTestCase
       service = HornetQServers.newHornetQServer(conf, false);
       service.start();
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      ClientSessionFactory sf = locator.createSessionFactory();
       session = sf.createSession(false, true, true);
       session.start();
 
@@ -233,6 +235,11 @@ public class NotificationTest extends UnitTestCase
 
       session.deleteQueue(notifQueue);
       session.close();
+
+      if(locator != null)
+      {
+         locator.close();
+      }
 
       service.stop();
 

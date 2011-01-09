@@ -13,7 +13,6 @@
 
 package org.hornetq.core.persistence;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -24,9 +23,11 @@ import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.core.journal.IOAsyncTask;
 import org.hornetq.core.journal.JournalLoadInformation;
+import org.hornetq.core.message.impl.MessageInternal;
 import org.hornetq.core.paging.PageTransactionInfo;
 import org.hornetq.core.paging.PagedMessage;
 import org.hornetq.core.paging.PagingManager;
+import org.hornetq.core.paging.cursor.PagePosition;
 import org.hornetq.core.persistence.config.PersistedAddressSetting;
 import org.hornetq.core.persistence.config.PersistedRoles;
 import org.hornetq.core.postoffice.Binding;
@@ -38,7 +39,6 @@ import org.hornetq.core.server.Queue;
 import org.hornetq.core.server.ServerMessage;
 import org.hornetq.core.server.group.impl.GroupBinding;
 import org.hornetq.core.transaction.ResourceManager;
-import org.hornetq.utils.UUID;
 
 /**
  * 
@@ -82,11 +82,7 @@ public interface StorageManager extends HornetQComponent
    void waitOnOperations() throws Exception;
 
    void clearContext();
-
-   UUID getPersistentID();
-
-   void setPersistentID(UUID id) throws Exception;
-
+   
    long generateUniqueID();
 
    long getCurrentUniqueID();
@@ -98,6 +94,8 @@ public interface StorageManager extends HornetQComponent
    void deleteMessage(long messageID) throws Exception;
 
    void storeAcknowledge(long queueID, long messageID) throws Exception;
+   
+   void storeCursorAcknowledge(long queueID, PagePosition position) throws Exception;
 
    void updateDeliveryCount(MessageReference ref) throws Exception;
 
@@ -113,6 +111,10 @@ public interface StorageManager extends HornetQComponent
 
    void storeAcknowledgeTransactional(long txID, long queueID, long messageID) throws Exception;
 
+   void storeCursorAcknowledgeTransactional(long txID, long queueID, PagePosition position) throws Exception;
+   
+   void deleteCursorAcknowledgeTransactional(long txID, long ackID) throws Exception;
+
    void updateScheduledDeliveryTimeTransactional(long txID, MessageReference ref) throws Exception;
 
    void deleteMessageTransactional(long txID, long queueID, long messageID) throws Exception;
@@ -125,7 +127,14 @@ public interface StorageManager extends HornetQComponent
 
    LargeServerMessage createLargeMessage();
 
-   LargeServerMessage createLargeMessage(long id, byte[] header);
+   /**
+    * 
+    * @param id
+    * @param message This is a temporary message that holds the parsed properties. 
+    *        The remoting layer can't create a ServerMessage directly, then this will be replaced.
+    * @return
+    */
+   LargeServerMessage createLargeMessage(long id, MessageInternal message);
 
    void prepare(long txID, Xid xid) throws Exception;
 
@@ -136,6 +145,8 @@ public interface StorageManager extends HornetQComponent
    void storePageTransaction(long txID, PageTransactionInfo pageTransaction) throws Exception;
    
    void updatePageTransaction(long txID, PageTransactionInfo pageTransaction,  int depage) throws Exception;
+   
+   void updatePageTransaction(PageTransactionInfo pageTransaction,  int depage) throws Exception;
 
    void deletePageTransactional(long recordID) throws Exception;
 
@@ -147,6 +158,7 @@ public interface StorageManager extends HornetQComponent
                                              final PagingManager pagingManager,
                                              final ResourceManager resourceManager,
                                              final Map<Long, Queue> queues,
+                                             Map<Long, QueueBindingInfo> queueInfos,
                                              final Map<SimpleString, List<Pair<byte[], Long>>> duplicateIDMap) throws Exception;
 
    long storeHeuristicCompletion(Xid xid, boolean isCommit) throws Exception;
@@ -177,4 +189,27 @@ public interface StorageManager extends HornetQComponent
    void deleteSecurityRoles(SimpleString addressMatch) throws Exception;
 
    List<PersistedRoles> recoverPersistedRoles() throws Exception;
+   
+   /** 
+    * @return The ID with the stored counter
+    */
+   long storePageCounter(long txID, long queueID, long value) throws Exception;
+   
+   void deleteIncrementRecord(long txID, long recordID) throws Exception;
+   
+   void deletePageCounter(long txID, long recordID) throws Exception;
+
+   /**
+    * @return the ID with the increment record
+    * @throws Exception 
+    */
+   long storePageCounterInc(long txID, long queueID, int add) throws Exception;
+   
+   /**
+    * @return the ID with the increment record
+    * @throws Exception 
+    */
+   long storePageCounterInc(long queueID, int add) throws Exception;
+   
+   
 }

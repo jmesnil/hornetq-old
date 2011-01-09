@@ -38,6 +38,11 @@ public interface RemotingConnection extends BufferHandler
    Object getID();
 
    /**
+    * Returns the creation time of the Remoting connection
+    */
+   long getCreationTime();
+
+   /**
     * returns a string representation of the remote address of this connection
     *
     * @return the remote address

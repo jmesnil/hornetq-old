@@ -21,9 +21,10 @@ import javax.jms.DeliveryMode;
 import javax.jms.MessageProducer;
 import javax.jms.Session;
 
-import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.jms.JMSFactoryType;
+import org.hornetq.core.remoting.impl.netty.NettyConnectorFactory;
 import org.hornetq.jms.client.HornetQConnectionFactory;
 
 /**
@@ -35,7 +36,7 @@ import org.hornetq.jms.client.HornetQConnectionFactory;
  *
  * $Id$
  */
-public class CTSMiscellaneousTest extends HornetQServerTestCase
+public class CTSMiscellaneousTest extends JMSTest
 {
    // Constants -----------------------------------------------------
 
@@ -47,7 +48,6 @@ public class CTSMiscellaneousTest extends HornetQServerTestCase
    private static final String ORG_JBOSS_MESSAGING_SERVICE_LBCONNECTION_FACTORY = "StrictTCKConnectionFactory";
 
    // Constructors --------------------------------------------------
-
    @Override
    protected void setUp() throws Exception
    {
@@ -58,20 +58,17 @@ public class CTSMiscellaneousTest extends HornetQServerTestCase
          List<String> bindings = new ArrayList<String>();
          bindings.add("StrictTCKConnectionFactory");
 
-         List<Pair<TransportConfiguration, TransportConfiguration>> connectorConfigs = new ArrayList<Pair<TransportConfiguration, TransportConfiguration>>();
-
-         connectorConfigs.add(new Pair<TransportConfiguration, TransportConfiguration>(new TransportConfiguration("org.hornetq.core.remoting.impl.netty.NettyConnectorFactory"),
-                                                                                       null));
-
-
          getJmsServerManager().createConnectionFactory("StrictTCKConnectionFactory",
-                                                       connectorConfigs,
+                                                       false,
+                                                       JMSFactoryType.CF,
+                                                       NETTY_CONNECTOR,
                                                        null,
                                                        HornetQClient.DEFAULT_CLIENT_FAILURE_CHECK_PERIOD,
                                                        HornetQClient.DEFAULT_CONNECTION_TTL,
                                                        HornetQClient.DEFAULT_CALL_TIMEOUT,
                                                        HornetQClient.DEFAULT_CACHE_LARGE_MESSAGE_CLIENT,
                                                        HornetQClient.DEFAULT_MIN_LARGE_MESSAGE_SIZE,
+                                                       HornetQClient.DEFAULT_COMPRESS_LARGE_MESSAGES,
                                                        HornetQClient.DEFAULT_CONSUMER_WINDOW_SIZE,
                                                        HornetQClient.DEFAULT_CONSUMER_MAX_RATE,
                                                        HornetQClient.DEFAULT_CONFIRMATION_WINDOW_SIZE,
@@ -93,7 +90,6 @@ public class CTSMiscellaneousTest extends HornetQServerTestCase
                                                        HornetQClient.DEFAULT_MAX_RETRY_INTERVAL,
                                                        HornetQClient.DEFAULT_RECONNECT_ATTEMPTS,
                                                        HornetQClient.DEFAULT_FAILOVER_ON_INITIAL_CONNECTION,
-                                                       HornetQClient.DEFAULT_FAILOVER_ON_SERVER_SHUTDOWN,
                                                        null,
                                                        "/StrictTCKConnectionFactory");
 

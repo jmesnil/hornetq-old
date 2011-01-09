@@ -20,11 +20,7 @@ import junit.framework.Assert;
 
 import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.SimpleString;
-import org.hornetq.api.core.client.ClientConsumer;
-import org.hornetq.api.core.client.ClientMessage;
-import org.hornetq.api.core.client.ClientProducer;
-import org.hornetq.api.core.client.ClientSession;
-import org.hornetq.api.core.client.ClientSessionFactory;
+import org.hornetq.api.core.client.*;
 import org.hornetq.core.config.Configuration;
 import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.server.HornetQServer;
@@ -186,13 +182,15 @@ public class MultiThreadConsumerStressTest extends ServiceTestBase
 
       server.start();
 
-      sf = createNettyFactory();
+      ServerLocator locator = createNettyNonHALocator();
 
-      sf.setBlockOnDurableSend(false);
+      locator.setBlockOnDurableSend(false);
 
-      sf.setBlockOnNonDurableSend(false);
+      locator.setBlockOnNonDurableSend(false);
 
-      sf.setBlockOnAcknowledge(false);
+      locator.setBlockOnAcknowledge(false);
+
+      sf = locator.createSessionFactory();
 
       ClientSession sess = sf.createSession();
 
@@ -205,8 +203,9 @@ public class MultiThreadConsumerStressTest extends ServiceTestBase
       }
 
       sess.close();
-
-      sf = createInVMFactory();
+      locator.close();
+      locator = createInVMNonHALocator();
+      sf = locator.createSessionFactory();
    }
 
    // Static --------------------------------------------------------

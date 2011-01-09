@@ -21,9 +21,9 @@ import javax.naming.Context;
 
 import junit.framework.Assert;
 
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.core.config.Configuration;
-import org.hornetq.core.config.DiscoveryGroupConfiguration;
 import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.deployers.DeploymentManager;
 import org.hornetq.core.deployers.impl.FileDeploymentManager;
@@ -219,7 +219,6 @@ public class JMSServerDeployerTest extends ServiceTestBase
          Assert.assertEquals(false, cf.isAutoGroup());
          Assert.assertEquals(true, cf.isPreAcknowledge());
          Assert.assertEquals(2345, cf.getConnectionTTL());
-         Assert.assertEquals(false, cf.isFailoverOnServerShutdown());
          assertEquals(true, cf.isFailoverOnInitialConnection());
          Assert.assertEquals(34, cf.getReconnectAttempts());
          Assert.assertEquals(5, cf.getRetryInterval());
@@ -306,17 +305,10 @@ public class JMSServerDeployerTest extends ServiceTestBase
          Assert.assertEquals(true, cf.isPreAcknowledge());
          Assert.assertEquals(2345, cf.getConnectionTTL());
          assertEquals(true, cf.isFailoverOnInitialConnection());
-         Assert.assertEquals(false, cf.isFailoverOnServerShutdown());
          Assert.assertEquals(34, cf.getReconnectAttempts());
          Assert.assertEquals(5, cf.getRetryInterval());
          Assert.assertEquals(6.0, cf.getRetryIntervalMultiplier());
          Assert.assertEquals(true, cf.isCacheLargeMessagesClient());
-         
-         assertEquals("243.7.7.7", cf.getDiscoveryAddress());
-         assertEquals("172.16.8.10", cf.getLocalBindAddress());
-         assertEquals(12345, cf.getDiscoveryPort());
-         assertEquals(5432, cf.getDiscoveryRefreshTimeout());
-         assertEquals(5464, cf.getDiscoveryInitialWaitTimeout());
       }
 
       for (String binding : queueBindings)
@@ -343,13 +335,13 @@ public class JMSServerDeployerTest extends ServiceTestBase
    {
       super.setUp();
 
-      config = new ConfigurationImpl();
+      config = createBasicConfig();
       config.getConnectorConfigurations().put("netty",
                                               new TransportConfiguration(NettyConnectorFactory.class.getName()));
       
       DiscoveryGroupConfiguration dcg = new DiscoveryGroupConfiguration("mygroup", "172.16.8.10",
                                                                         "243.7.7.7", 12345,
-                                                                        5432);
+                                                                        5432, 5432);
       config.getDiscoveryGroupConfigurations().put("mygroup", dcg);
       HornetQServer server = createServer(false, config);
 

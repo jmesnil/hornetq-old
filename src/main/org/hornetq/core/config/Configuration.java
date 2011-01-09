@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.Interceptor;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.TransportConfiguration;
@@ -37,6 +38,13 @@ import org.hornetq.spi.core.logging.LogDelegateFactory;
 public interface Configuration extends Serializable
 {
    // General attributes -------------------------------------------------------------------
+   
+   
+   /** To be used on dependency management on the application server */
+   String getName();
+   
+   /** To be used on dependency management on the application server */
+   void setName(String name);
 
    /**
     * Returns whether this server is clustered.
@@ -49,6 +57,19 @@ public interface Configuration extends Serializable
     * Sets whether this server is clustered or not.
     */
    void setClustered(boolean clustered);
+
+   /**
+    * returns whether a backup will auto die when a live server is failing back
+    * @return
+    */
+   public boolean isAllowAutoFailBack();
+
+   /**
+    * whether a backup will auto die when a live server is failing back
+    *
+    * @param allowAutoFailBack true if allowed
+    */
+   public void setAllowAutoFailBack(boolean allowAutoFailBack);
 
    /**
     * Returns whether delivery count is persisted before messages are delivered to the consumers.
@@ -258,16 +279,15 @@ public interface Configuration extends Serializable
    void setConnectorConfigurations(Map<String, TransportConfiguration> infos);
 
    /**
-    * Returns the name of the connector used to connect to the backup.
-    * <br>
-    * If this server has no backup or is itself a backup, the value is {@code null}.
+    * Returns the name of the connector used to connect to the live node - only used when using shared nothing (shared store = false).
+    * <br> 
     */
-   String getBackupConnectorName();
+   String getLiveConnectorName();
 
    /**
-    * Sets the name of the connector used to connect to the backup.
+    * Sets the name of the connector used to connect to the live node - only used when using shared nothing (shared store = false).
     */
-   void setBackupConnectorName(String name);
+   void setLiveConnectorName(String name);
 
    /**
     * Returns the broadcast groups configured for this server.
@@ -385,6 +405,17 @@ public interface Configuration extends Serializable
     * Default value is {@value org.hornetq.core.config.impl.ConfigurationImpl#DEFAULT_CLUSTER_PASSWORD}.
     */
    String getClusterPassword();
+
+   /**
+    * should we notify any clients on close that they should failover
+    * @return true if clients should failover
+    */
+   boolean isFailoverOnServerShutdown();
+
+   /*
+   * set to allow clients to failover on server shutdown
+   * */
+   void setFailoverOnServerShutdown(boolean failoverOnServerShutdown);
 
    /**
     * Sets the cluster password for this server.

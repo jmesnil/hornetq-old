@@ -74,6 +74,7 @@ public class JMSServerConfigParserTest extends ServiceTestBase
       assertEquals(7712652, cfConfig.getProducerWindowSize());
       assertEquals(789, cfConfig.getProducerMaxRate());
       assertEquals(12, cfConfig.getMinLargeMessageSize());
+      assertEquals(true, cfConfig.isCompressLargeMessages());
       assertEquals("TestClientID", cfConfig.getClientID());
       assertEquals(3456, cfConfig.getDupsOKBatchSize());
       assertEquals(4567, cfConfig.getTransactionBatchSize());
@@ -83,7 +84,6 @@ public class JMSServerConfigParserTest extends ServiceTestBase
       assertEquals(false, cfConfig.isAutoGroup());
       assertEquals(true, cfConfig.isPreAcknowledge());
       assertEquals(2345, cfConfig.getConnectionTTL());
-      assertEquals(false, cfConfig.isFailoverOnServerShutdown());
       assertEquals("FooClass", cfConfig.getLoadBalancingPolicyClassName());
       assertEquals(34, cfConfig.getReconnectAttempts());
       assertEquals(5, cfConfig.getRetryInterval());

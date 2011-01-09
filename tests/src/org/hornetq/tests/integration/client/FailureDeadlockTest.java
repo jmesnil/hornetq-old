@@ -20,6 +20,7 @@ import javax.jms.Session;
 import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.jms.HornetQJMSClient;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.core.client.impl.ClientSessionInternal;
 import org.hornetq.core.config.Configuration;
 import org.hornetq.core.config.impl.ConfigurationImpl;
@@ -31,6 +32,7 @@ import org.hornetq.jms.client.HornetQSession;
 import org.hornetq.jms.server.impl.JMSServerManagerImpl;
 import org.hornetq.spi.core.protocol.RemotingConnection;
 import org.hornetq.tests.integration.jms.server.management.NullInitialContext;
+import org.hornetq.tests.util.ServiceTestBase;
 import org.hornetq.tests.util.UnitTestCase;
 
 /**
@@ -41,7 +43,7 @@ import org.hornetq.tests.util.UnitTestCase;
  *
  *
  */
-public class FailureDeadlockTest extends UnitTestCase
+public class FailureDeadlockTest extends ServiceTestBase
 {
    private static final Logger log = Logger.getLogger(FailureDeadlockTest.class);
 
@@ -58,7 +60,7 @@ public class FailureDeadlockTest extends UnitTestCase
    {
       super.setUp();
 
-      Configuration conf = new ConfigurationImpl();
+      Configuration conf = createDefaultConfig();
       conf.setSecurityEnabled(false);
       conf.getAcceptorConfigurations()
           .add(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMAcceptorFactory"));
@@ -66,9 +68,10 @@ public class FailureDeadlockTest extends UnitTestCase
       jmsServer = new JMSServerManagerImpl(server);
       jmsServer.setContext(new NullInitialContext());
       jmsServer.start();
-      cf1 = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
 
-      cf2 = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      cf1 = HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+
+      cf2 =  HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF,new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
    }
 
    @Override
@@ -92,6 +95,10 @@ public class FailureDeadlockTest extends UnitTestCase
 
       }
 
+      cf1.close();
+
+      cf2.close();
+      
       server = null;
 
       jmsServer = null;
@@ -187,7 +194,15 @@ public class FailureDeadlockTest extends UnitTestCase
 
          rc1.fail(new HornetQException(HornetQException.NOT_CONNECTED, "blah"));
 
-         Session sess2 = conn1.createSession(false, Session.AUTO_ACKNOWLEDGE);
+         try
+         {
+            Session sess2 = conn1.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            fail("should throw exception");
+         }
+         catch (JMSException e)
+         {
+            //pass
+         }
 
          conn1.close();
       }

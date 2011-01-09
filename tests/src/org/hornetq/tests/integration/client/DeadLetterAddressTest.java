@@ -23,26 +23,35 @@ import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.Message;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.TransportConfiguration;
-import org.hornetq.api.core.client.*;
-import org.hornetq.core.config.impl.ConfigurationImpl;
+import org.hornetq.api.core.client.ClientConsumer;
+import org.hornetq.api.core.client.ClientMessage;
+import org.hornetq.api.core.client.ClientProducer;
+import org.hornetq.api.core.client.ClientSession;
+import org.hornetq.api.core.client.ClientSessionFactory;
+import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.MessageHandler;
+import org.hornetq.api.core.client.ServerLocator;
+import org.hornetq.core.config.Configuration;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.HornetQServers;
 import org.hornetq.core.server.Queue;
 import org.hornetq.core.settings.impl.AddressSettings;
 import org.hornetq.tests.util.RandomUtil;
+import org.hornetq.tests.util.ServiceTestBase;
 import org.hornetq.tests.util.UnitTestCase;
 
 /**
  * @author <a href="mailto:andy.taylor@jboss.org">Andy Taylor</a>
  */
-public class DeadLetterAddressTest extends UnitTestCase
+public class DeadLetterAddressTest extends ServiceTestBase
 {
    private static final Logger log = Logger.getLogger(DeadLetterAddressTest.class);
 
    private HornetQServer server;
 
    private ClientSession clientSession;
+   private ServerLocator locator;
 
    public void testBasicSend() throws Exception
    {
@@ -241,7 +250,8 @@ public class DeadLetterAddressTest extends UnitTestCase
       SimpleString dlq = new SimpleString("DLQ1");
       clientSession.createQueue(dla, dlq, null, false);
       clientSession.createQueue(qName, qName, null, false);
-      ClientSessionFactory sessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      ClientSessionFactory sessionFactory = locator.createSessionFactory();
       ClientSession sendSession = sessionFactory.createSession(false, true, true);
       ClientProducer producer = sendSession.createProducer(qName);
       Map<String, Long> origIds = new HashMap<String, Long>();
@@ -456,7 +466,7 @@ public class DeadLetterAddressTest extends UnitTestCase
    {
       super.setUp();
 
-      ConfigurationImpl configuration = new ConfigurationImpl();
+      Configuration configuration = createDefaultConfig();
       configuration.setSecurityEnabled(false);
       TransportConfiguration transportConfig = new TransportConfiguration(UnitTestCase.INVM_ACCEPTOR_FACTORY);
       configuration.getAcceptorConfigurations().add(transportConfig);
@@ -464,7 +474,8 @@ public class DeadLetterAddressTest extends UnitTestCase
       // start the server
       server.start();
       // then we create a client as normal
-      ClientSessionFactory sessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      ClientSessionFactory sessionFactory = locator.createSessionFactory();
       clientSession = sessionFactory.createSession(false, true, false);
    }
 
@@ -478,6 +489,17 @@ public class DeadLetterAddressTest extends UnitTestCase
             clientSession.close();
          }
          catch (HornetQException e1)
+         {
+            //
+         }
+      }
+      if(locator != null)
+      {
+         try
+         {
+            locator.close();
+         }
+         catch (Exception e)
          {
             //
          }

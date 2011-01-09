@@ -20,6 +20,7 @@ import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.Message;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.core.message.BodyEncoder;
+import org.hornetq.utils.TypedProperties;
 
 /**
  * A MessageInternal
@@ -43,6 +44,8 @@ public interface MessageInternal extends Message
    void bodyChanged();
 
    void resetCopied();
+   
+   boolean isServerMessage();
 
    HornetQBuffer getEncodedBuffer();
    
@@ -59,4 +62,6 @@ public interface MessageInternal extends Message
    InputStream getBodyInputStream();
 
    void setAddressTransient(SimpleString address);
+   
+   TypedProperties getTypedProperties();
 }

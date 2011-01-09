@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -35,7 +36,6 @@ import javax.management.NotificationListener;
 import javax.transaction.xa.Xid;
 
 import org.hornetq.api.core.HornetQException;
-import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.management.AddressControl;
@@ -64,6 +64,8 @@ import org.hornetq.core.settings.impl.AddressFullMessagePolicy;
 import org.hornetq.core.settings.impl.AddressSettings;
 import org.hornetq.core.transaction.ResourceManager;
 import org.hornetq.core.transaction.Transaction;
+import org.hornetq.core.transaction.TransactionDetail;
+import org.hornetq.core.transaction.impl.CoreTransactionDetail;
 import org.hornetq.core.transaction.impl.XidImpl;
 import org.hornetq.spi.core.protocol.RemotingConnection;
 import org.hornetq.utils.SecurityFormatter;
@@ -188,14 +190,14 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       }
    }
 
-   public String getBackupConnectorName()
+   public String getLiveConnectorName()
    {
       checkStarted();
 
       clearIO();
       try
       {
-         return configuration.getBackupConnectorName();
+         return configuration.getLiveConnectorName();
       }
       finally
       {
@@ -207,7 +209,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
    {
       checkStarted();
 
-     clearIO();
+      clearIO();
       try
       {
          return configuration.getBindingsDirectory();
@@ -421,7 +423,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
    {
       checkStarted();
 
-     clearIO();
+      clearIO();
       try
       {
          return configuration.getThreadPoolMaxSize();
@@ -902,6 +904,134 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       }
    }
 
+   public String listPreparedTransactionDetailsAsJSON() throws Exception
+   {
+      checkStarted();
+
+      clearIO();
+      try
+      {
+         Map<Xid, Long> xids = resourceManager.getPreparedTransactionsWithCreationTime();
+         if (xids == null || xids.size() == 0)
+         {
+            return "";
+         }
+
+         ArrayList<Entry<Xid, Long>> xidsSortedByCreationTime = new ArrayList<Map.Entry<Xid, Long>>(xids.entrySet());
+         Collections.sort(xidsSortedByCreationTime, new Comparator<Entry<Xid, Long>>()
+         {
+            public int compare(final Entry<Xid, Long> entry1, final Entry<Xid, Long> entry2)
+            {
+               // sort by creation time, oldest first
+               return (int)(entry1.getValue() - entry2.getValue());
+            }
+         });
+
+         JSONArray txDetailListJson = new JSONArray();
+         for (Map.Entry<Xid, Long> entry : xidsSortedByCreationTime)
+         {
+            Xid xid = entry.getKey();
+            TransactionDetail detail = new CoreTransactionDetail(xid,
+                                                                 resourceManager.getTransaction(xid),
+                                                                 entry.getValue());
+
+            txDetailListJson.put(detail.toJSON());
+         }
+         return txDetailListJson.toString();
+      }
+      finally
+      {
+         blockOnIO();
+      }
+   }
+
+   public String listPreparedTransactionDetailsAsHTML() throws Exception
+   {
+      checkStarted();
+
+      clearIO();
+      try
+      {
+         Map<Xid, Long> xids = resourceManager.getPreparedTransactionsWithCreationTime();
+         if (xids == null || xids.size() == 0)
+         {
+            return "<h3>*** Prepared Transaction Details ***</h3><p>No entry.</p>";
+         }
+
+         ArrayList<Entry<Xid, Long>> xidsSortedByCreationTime = new ArrayList<Map.Entry<Xid, Long>>(xids.entrySet());
+         Collections.sort(xidsSortedByCreationTime, new Comparator<Entry<Xid, Long>>()
+         {
+            public int compare(final Entry<Xid, Long> entry1, final Entry<Xid, Long> entry2)
+            {
+               // sort by creation time, oldest first
+               return (int)(entry1.getValue() - entry2.getValue());
+            }
+         });
+
+         StringBuilder html = new StringBuilder();
+         html.append("<h3>*** Prepared Transaction Details ***</h3>");
+
+         for (Map.Entry<Xid, Long> entry : xidsSortedByCreationTime)
+         {
+            Xid xid = entry.getKey();
+            TransactionDetail detail = new CoreTransactionDetail(xid,
+                                                                 resourceManager.getTransaction(xid),
+                                                                 entry.getValue());
+
+            JSONObject txJson = detail.toJSON();
+
+            html.append("<table border=\"1\">");
+            html.append("<tr><th>creation_time</th>");
+            html.append("<td>" + txJson.get(TransactionDetail.KEY_CREATION_TIME) + "</td>");
+            html.append("<th>xid_as_base_64</th>");
+            html.append("<td colspan=\"3\">" + txJson.get(TransactionDetail.KEY_XID_AS_BASE64) + "</td></tr>");
+            html.append("<tr><th>xid_format_id</th>");
+            html.append("<td>" + txJson.get(TransactionDetail.KEY_XID_FORMAT_ID) + "</td>");
+            html.append("<th>xid_global_txid</th>");
+            html.append("<td>" + txJson.get(TransactionDetail.KEY_XID_GLOBAL_TXID) + "</td>");
+            html.append("<th>xid_branch_qual</th>");
+            html.append("<td>" + txJson.get(TransactionDetail.KEY_XID_BRANCH_QUAL) + "</td></tr>");
+
+            html.append("<tr><th colspan=\"6\">Message List</th></tr>");
+            html.append("<tr><td colspan=\"6\">");
+            html.append("<table border=\"1\" cellspacing=\"0\" cellpadding=\"0\">");
+
+            JSONArray msgs = txJson.getJSONArray(TransactionDetail.KEY_TX_RELATED_MESSAGES);
+            for (int i = 0; i < msgs.length(); i++)
+            {
+               JSONObject msgJson = msgs.getJSONObject(i);
+               JSONObject props = msgJson.getJSONObject(TransactionDetail.KEY_MSG_PROPERTIES);
+               StringBuilder propstr = new StringBuilder();
+               @SuppressWarnings("unchecked")
+               Iterator<String> propkeys = props.keys();
+               while (propkeys.hasNext())
+               {
+                  String key = propkeys.next();
+                  propstr.append(key);
+                  propstr.append("=");
+                  propstr.append(props.get(key));
+                  propstr.append(", ");
+               }
+
+               html.append("<th>operation_type</th>");
+               html.append("<td>" + msgJson.get(TransactionDetail.KEY_MSG_OP_TYPE) + "</th>");
+               html.append("<th>message_type</th>");
+               html.append("<td>" + msgJson.get(TransactionDetail.KEY_MSG_TYPE) + "</td></tr>");
+               html.append("<tr><th>properties</th>");
+               html.append("<td colspan=\"3\">" + propstr.toString() + "</td></tr>");
+            }
+            html.append("</table></td></tr>");
+            html.append("</table><br/>");
+         }
+
+         return html.toString();
+      }
+      finally
+      {
+         blockOnIO();
+      }
+   }
+
    public String[] listHeuristicCommittedTransactions()
    {
       checkStarted();
@@ -1128,6 +1258,24 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
          blockOnIO();
       }
    }
+   
+
+   /* (non-Javadoc)
+    * @see org.hornetq.api.core.management.HornetQServerControl#listProducersInfoAsJSON()
+    */
+   public String listProducersInfoAsJSON() throws Exception
+   {
+      JSONArray producers = new JSONArray();
+      
+      
+      for (ServerSession session : server.getSessions())
+      {
+         session.describeProducersInfo(producers);
+      }
+      
+      return producers.toString();
+   }
+
 
    public Object[] getConnectors() throws Exception
    {
@@ -1183,14 +1331,14 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       }
    }
 
-   public void addSecuritySettings(String addressMatch,
-                                   String sendRoles,
-                                   String consumeRoles,
-                                   String createDurableQueueRoles,
-                                   String deleteDurableQueueRoles,
-                                   String createNonDurableQueueRoles,
-                                   String deleteNonDurableQueueRoles,
-                                   String manageRoles) throws Exception
+   public void addSecuritySettings(final String addressMatch,
+                                   final String sendRoles,
+                                   final String consumeRoles,
+                                   final String createDurableQueueRoles,
+                                   final String deleteDurableQueueRoles,
+                                   final String createNonDurableQueueRoles,
+                                   final String deleteNonDurableQueueRoles,
+                                   final String manageRoles) throws Exception
    {
       checkStarted();
 
@@ -1215,7 +1363,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
                                                             createNonDurableQueueRoles,
                                                             deleteNonDurableQueueRoles,
                                                             manageRoles);
-         
+
          storageManager.storeSecurityRoles(persistedRoles);
       }
       finally
@@ -1224,7 +1372,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       }
    }
 
-   public void removeSecuritySettings(String addressMatch) throws Exception
+   public void removeSecuritySettings(final String addressMatch) throws Exception
    {
       checkStarted();
 
@@ -1240,7 +1388,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       }
    }
 
-   public Object[] getRoles(String addressMatch) throws Exception
+   public Object[] getRoles(final String addressMatch) throws Exception
    {
       checkStarted();
 
@@ -1273,7 +1421,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       }
    }
 
-   public String getRolesAsJSON(String addressMatch) throws Exception
+   public String getRolesAsJSON(final String addressMatch) throws Exception
    {
       checkStarted();
 
@@ -1336,7 +1484,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
                                   final long redistributionDelay,
                                   final boolean sendToDLAOnNoRoute,
                                   final String addressFullMessagePolicy) throws Exception
-                                  {
+   {
       checkStarted();
 
       AddressSettings addressSettings = new AddressSettings();
@@ -1370,7 +1518,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       storageManager.storeAddressSetting(new PersistedAddressSetting(new SimpleString(address), addressSettings));
    }
 
-   public void removeAddressSettings(String addressMatch) throws Exception
+   public void removeAddressSettings(final String addressMatch) throws Exception
    {
       checkStarted();
 
@@ -1392,7 +1540,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
          blockOnIO();
       }
    }
-   
+
    public String[] getDivertNames()
    {
       checkStarted();
@@ -1415,15 +1563,15 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
          blockOnIO();
       }
    }
-   
-   public void createDivert(String name,
-                            String routingName,
-                            String address,
-                            String forwardingAddress,
-                            boolean exclusive,
-                            String filterString,
-                            String transformerClassName) throws Exception
-                            {
+
+   public void createDivert(final String name,
+                            final String routingName,
+                            final String address,
+                            final String forwardingAddress,
+                            final boolean exclusive,
+                            final String filterString,
+                            final String transformerClassName) throws Exception
+   {
       checkStarted();
 
       clearIO();
@@ -1442,9 +1590,9 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       {
          blockOnIO();
       }
-                            }
-   
-   public void destroyDivert(String name) throws Exception
+   }
+
+   public void destroyDivert(final String name) throws Exception
    {
       checkStarted();
 
@@ -1458,7 +1606,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
          blockOnIO();
       }
    }
-   
+
    public String[] getBridgeNames()
    {
       checkStarted();
@@ -1481,7 +1629,7 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
          blockOnIO();
       }
    }
-   
+
    public void createBridge(final String name,
                             final String queueName,
                             final String forwardingAddress,
@@ -1490,88 +1638,69 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
                             final long retryInterval,
                             final double retryIntervalMultiplier,
                             final int reconnectAttempts,
-                            final boolean failoverOnServerShutdown,
                             final boolean useDuplicateDetection,
                             final int confirmationWindowSize,
                             final long clientFailureCheckPeriod,
-                            final String liveConnector,
-                            final String backupConnector,
+                            final String connectorNames,
+                            boolean useDiscoveryGroup,
+                            final boolean ha,
                             final String user,
                             final String password) throws Exception
    {
       checkStarted();
 
       clearIO();
-      try
-      {
-         Pair<String, String> connectors = new Pair<String, String>(liveConnector, backupConnector);
-         BridgeConfiguration config = new BridgeConfiguration(name,
-                                                              queueName,
-                                                              forwardingAddress,
-                                                              filterString,
-                                                              transformerClassName,
-                                                              retryInterval,
-                                                              retryIntervalMultiplier,
-                                                              reconnectAttempts,
-                                                              failoverOnServerShutdown,
-                                                              useDuplicateDetection,
-                                                              confirmationWindowSize,
-                                                              clientFailureCheckPeriod,
-                                                              connectors,
-                                                              user,
-                                                              password);
-         server.deployBridge(config);
-      }
-      finally
-      {
-         blockOnIO();
-      }      
-   }
-   
-   public void createBridge(final String name,
-                            final String queueName,
-                            final String forwardingAddress,
-                            final String filterString,
-                            final String transformerClassName,
-                            final long retryInterval,
-                            final double retryIntervalMultiplier,
-                            final int reconnectAttempts,
-                            final boolean failoverOnServerShutdown,
-                            final boolean useDuplicateDetection,
-                            final int confirmationWindowSize,
-                            final long clientFailureCheckPeriod,
-                            final String discoveryGroupName,
-                            final String user,
-                            final String password) throws Exception
-   {
-      checkStarted();
 
-      clearIO();
+
       try
       {
-         BridgeConfiguration config = new BridgeConfiguration(name,
-                                                              queueName,
-                                                              forwardingAddress,
-                                                              filterString,
-                                                              transformerClassName,
-                                                              retryInterval,
-                                                              retryIntervalMultiplier,
-                                                              reconnectAttempts,
-                                                              failoverOnServerShutdown,
-                                                              useDuplicateDetection,
-                                                              confirmationWindowSize,
-                                                              clientFailureCheckPeriod,
-                                                              discoveryGroupName,
-                                                              user,
-                                                              password);
+         BridgeConfiguration config = null;
+         if (useDiscoveryGroup)
+         {
+            config = new BridgeConfiguration(name,
+                                            queueName,
+                                            forwardingAddress,
+                                            filterString,
+                                            transformerClassName,
+                                            retryInterval,
+                                            retryIntervalMultiplier,
+                                            reconnectAttempts,
+                                            useDuplicateDetection,
+                                            confirmationWindowSize,
+                                            clientFailureCheckPeriod,
+                                            connectorNames,
+                                            ha,
+                                            user,
+                                            password);
+         }
+         else
+         {
+            List<String> connectors = toList(connectorNames);
+            config = new BridgeConfiguration(name,
+                                            queueName,
+                                            forwardingAddress,
+                                            filterString,
+                                            transformerClassName,
+                                            retryInterval,
+                                            retryIntervalMultiplier,
+                                            reconnectAttempts,
+                                            useDuplicateDetection,
+                                            confirmationWindowSize,
+                                            clientFailureCheckPeriod,
+                                            connectors,
+                                            ha,
+                                            user,
+                                            password);
+         }
          server.deployBridge(config);
       }
       finally
       {
          blockOnIO();
-      }      
+      }
    }
-   
+
+
    public void destroyBridge(final String name) throws Exception
    {
       checkStarted();
@@ -1584,9 +1713,24 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
       finally
       {
          blockOnIO();
-      }      
-   } 
-   
+      }
+   }
+
+   public void forceFailover() throws Exception
+   {
+      checkStarted();
+
+      clearIO();
+
+      try
+      {
+         server.stop(true);
+      }
+      finally
+      {
+         blockOnIO();
+      }
+   }
    // NotificationEmitter implementation ----------------------------
 
    public void removeNotificationListener(final NotificationListener listener,
@@ -1742,17 +1886,42 @@ public class HornetQServerControlImpl extends AbstractControl implements HornetQ
    }
 
    @Override
-   MBeanOperationInfo[] fillMBeanOperationInfo()
+   protected MBeanOperationInfo[] fillMBeanOperationInfo()
    {
       return MBeanInfoHelper.getMBeanOperationsInfo(HornetQServerControl.class);
    }
-   
+
    private void checkStarted()
    {
       if (!server.isStarted())
       {
          throw new IllegalStateException("HornetQ Server is not started. It can not be managed yet");
       }
+   }
+
+   public String[] listTargetAddresses(final String sessionID)
+   {
+      ServerSession session = server.getSessionByID(sessionID);
+      if (session != null)
+      {
+         return session.getTargetAddresses();
+      }
+      return new String[0];
+   }
+
+   private static List<String> toList(final String commaSeparatedString)
+   {
+      List<String> list = new ArrayList<String>();
+      if (commaSeparatedString == null || commaSeparatedString.trim().length() == 0)
+      {
+         return list;
+      }
+      String[] values = commaSeparatedString.split(",");
+      for (int i = 0; i < values.length; i++)
+      {
+         list.add(values[i].trim());
+      }
+      return list;
    }
 
 }

@@ -15,6 +15,7 @@ package org.hornetq.spi.core.protocol;
 
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.core.server.ServerMessage;
+import org.hornetq.spi.core.remoting.ReadyListener;
 
 /**
  * A SessionCallback
@@ -29,9 +30,13 @@ public interface SessionCallback
 
    int sendMessage(ServerMessage message, long consumerID, int deliveryCount);
 
-   int sendLargeMessage(long consumerID, byte[] headerBuffer, long bodySize, int deliveryCount);
+   int sendLargeMessage(ServerMessage message, long consumerID, long bodySize, int deliveryCount);
 
    int sendLargeMessageContinuation(long consumerID, byte[] body, boolean continues, boolean requiresResponse);
    
    void closed();
+   
+   void addReadyListener(ReadyListener listener);
+   
+   void removeReadyListener(ReadyListener listener);
 }
