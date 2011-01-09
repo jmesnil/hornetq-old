@@ -37,6 +37,7 @@ import org.hornetq.core.remoting.impl.invm.InVMRegistry;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.HornetQServers;
 import org.hornetq.jms.client.HornetQTextMessage;
+import org.hornetq.tests.util.ServiceTestBase;
 import org.hornetq.tests.util.UnitTestCase;
 
 /**
@@ -230,11 +231,13 @@ public class RandomReattachTest extends UnitTestCase
       {
          RandomReattachTest.log.info("####" + getName() + " iteration #" + its);
          start();
+         ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
 
-         ClientSessionFactoryImpl sf = (ClientSessionFactoryImpl) HornetQClient.createClientSessionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+         locator.setReconnectAttempts(-1);
+         locator.setConfirmationWindowSize(1024 * 1024);
 
-         sf.setReconnectAttempts(-1);
-         sf.setConfirmationWindowSize(1024 * 1024);
+         ClientSessionFactoryImpl sf = (ClientSessionFactoryImpl) locator.createSessionFactory();
+
 
          ClientSession session = sf.createSession(false, false, false);
 
@@ -247,6 +250,8 @@ public class RandomReattachTest extends UnitTestCase
          while (!failer.isExecuted());
 
          session.close();
+
+         locator.close();
 
          Assert.assertEquals(0, sf.numSessions());
 
@@ -1464,7 +1469,7 @@ public class RandomReattachTest extends UnitTestCase
 
    private void start() throws Exception
    {
-      Configuration liveConf = new ConfigurationImpl();
+      Configuration liveConf = createDefaultConfig();
       liveConf.setSecurityEnabled(false);
       liveConf.getAcceptorConfigurations()
               .add(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMAcceptorFactory"));

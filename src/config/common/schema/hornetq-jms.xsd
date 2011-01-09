@@ -10,6 +10,7 @@
    <xsd:element name="configuration">
    	<xsd:complexType>
    		<xsd:sequence>
+            <xsd:element ref="jmx-domain" minOccurs="0" maxOccurs="1"/>
    			<xsd:element ref="connection-factory"
    				maxOccurs="unbounded" minOccurs="0">
    			</xsd:element>
@@ -23,11 +24,13 @@
    	</xsd:complexType>
    </xsd:element>
 
+   <xsd:element name="jmx-domain" type="xsd:string"/> 
+
    <xsd:element name="connection-factory">
    	<xsd:complexType>
    		<xsd:all>
+           	<xsd:element name="xa" type="xsd:boolean" maxOccurs="1" minOccurs="0"></xsd:element>
            	<xsd:element name="discovery-group-ref" type="discovery-group-refType" maxOccurs="1" minOccurs="0"></xsd:element>
-           	<xsd:element name="discovery-initial-wait-timeout" type="xsd:long" maxOccurs="1" minOccurs="0"></xsd:element>
 	
             <xsd:element name="connectors" maxOccurs="1" minOccurs="0">
                 <xsd:complexType>
@@ -75,7 +78,11 @@
             </xsd:element>
    			<xsd:element name="min-large-message-size" type="xsd:long"
    				maxOccurs="1" minOccurs="0">
-   			</xsd:element>   			          
+   			</xsd:element>   			 
+   			<xsd:element name="compress-large-messages" type="xsd:boolean"
+                maxOccurs="1" minOccurs="0">
+            </xsd:element>
+   			         
             <xsd:element name="client-id" type="xsd:string"
                 maxOccurs="1" minOccurs="0">
             </xsd:element>            
@@ -133,14 +140,17 @@
             <xsd:element name="group-id" type="xsd:string"
                 maxOccurs="1" minOccurs="0">
             </xsd:element>
+            <xsd:element name="ha" type="xsd:boolean"
+                maxOccurs="1" minOccurs="0">
+            </xsd:element>
    		</xsd:all>
    		<xsd:attribute name="name" type="xsd:string"></xsd:attribute>
+   		<xsd:attribute name="signature" type="xsd:string"></xsd:attribute>
    	</xsd:complexType>
    </xsd:element>
 
     <xsd:complexType name="connector-refType">
     	<xsd:attribute name="connector-name" type="xsd:string" use="required"></xsd:attribute>
-    	<xsd:attribute name="backup-connector-name" type="xsd:string" use="optional"></xsd:attribute>
     </xsd:complexType>
     
     <xsd:complexType name="entryType">

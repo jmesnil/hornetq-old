@@ -30,6 +30,7 @@ import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.core.client.impl.ClientSessionInternal;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.remoting.impl.netty.NettyConnectorFactory;
@@ -61,19 +62,21 @@ public class SessionClosedOnRemotingConnectionFailureTest extends JMSTestBase
 
    public void testSessionClosedOnRemotingConnectionFailure() throws Exception
    {
-      List<Pair<TransportConfiguration, TransportConfiguration>> connectorConfigs = new ArrayList<Pair<TransportConfiguration, TransportConfiguration>>();
-      connectorConfigs.add(new Pair<TransportConfiguration, TransportConfiguration>(new TransportConfiguration(NettyConnectorFactory.class.getName()),
-                                                                                    null));
+      List<TransportConfiguration> connectorConfigs = new ArrayList<TransportConfiguration>();
+      connectorConfigs.add(new TransportConfiguration(NettyConnectorFactory.class.getName()));
 
 
       jmsServer.createConnectionFactory("cffoo",
-                                        connectorConfigs,
+                                          false,
+                                          JMSFactoryType.CF,
+                                        registerConnectors(server, connectorConfigs),
                                         null,
                                         HornetQClient.DEFAULT_CLIENT_FAILURE_CHECK_PERIOD,
                                         HornetQClient.DEFAULT_CONNECTION_TTL,
                                         HornetQClient.DEFAULT_CALL_TIMEOUT,
                                         HornetQClient.DEFAULT_CACHE_LARGE_MESSAGE_CLIENT,
                                         HornetQClient.DEFAULT_MIN_LARGE_MESSAGE_SIZE,
+                                        HornetQClient.DEFAULT_COMPRESS_LARGE_MESSAGES,
                                         HornetQClient.DEFAULT_CONSUMER_WINDOW_SIZE,
                                         HornetQClient.DEFAULT_CONSUMER_MAX_RATE,
                                         HornetQClient.DEFAULT_CONFIRMATION_WINDOW_SIZE,
@@ -95,7 +98,6 @@ public class SessionClosedOnRemotingConnectionFailureTest extends JMSTestBase
                                         HornetQClient.DEFAULT_MAX_RETRY_INTERVAL,
                                         0,
                                         HornetQClient.DEFAULT_FAILOVER_ON_INITIAL_CONNECTION,
-                                        false,
                                         null,
                                         "/cffoo");
 

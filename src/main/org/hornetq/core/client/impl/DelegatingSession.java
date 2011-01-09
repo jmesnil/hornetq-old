@@ -134,9 +134,10 @@ public class DelegatingSession implements ClientSessionInternal
       session.forceDelivery(consumerID, sequence);
    }
 
-   public void cleanUp() throws Exception
+
+   public void cleanUp(boolean failingOver) throws Exception
    {
-      session.cleanUp();
+      session.cleanUp(failingOver);
    }
 
    public void close() throws HornetQException
@@ -506,9 +507,9 @@ public class DelegatingSession implements ClientSessionInternal
       session.stop();
    }
 
-   public FailoverManager getConnectionManager()
+   public ClientSessionFactoryInternal getSessionFactory()
    {
-      return session.getConnectionManager();
+      return session.getSessionFactory();
    }
 
    public void setForceNotSameRM(final boolean force)
@@ -554,5 +555,15 @@ public class DelegatingSession implements ClientSessionInternal
    public void setPacketSize(int packetSize)
    {
       session.setPacketSize(packetSize);
+   }
+
+   public void addMetaData(String key, String data) throws HornetQException
+   {
+      session.addMetaData(key, data);
+   }
+
+   public boolean isCompressLargeMessages()
+   {
+      return session.isCompressLargeMessages();
    }
 }

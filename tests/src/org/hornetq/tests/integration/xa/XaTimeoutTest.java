@@ -15,6 +15,7 @@ package org.hornetq.tests.integration.xa;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -30,8 +31,10 @@ import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.*;
 import org.hornetq.core.config.impl.ConfigurationImpl;
+import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.HornetQServers;
+import org.hornetq.core.server.MessageReference;
 import org.hornetq.core.server.Queue;
 import org.hornetq.core.settings.impl.AddressSettings;
 import org.hornetq.core.transaction.Transaction;
@@ -68,7 +71,7 @@ public class XaTimeoutTest extends UnitTestCase
       super.setUp();
 
       addressSettings.clear();
-      configuration = new ConfigurationImpl();
+      configuration = createBasicConfig();
       configuration.setSecurityEnabled(false);
       configuration.setTransactionTimeoutScanPeriod(500);
       TransportConfiguration transportConfig = new TransportConfiguration(UnitTestCase.INVM_ACCEPTOR_FACTORY);
@@ -77,7 +80,8 @@ public class XaTimeoutTest extends UnitTestCase
       // start the server
       messagingService.start();
       // then we create a client as normal
-      sessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      sessionFactory = locator.createSessionFactory();
       clientSession = sessionFactory.createSession(true, false, false);
       clientSession.createQueue(atestq, atestq, null, true);
       clientProducer = clientSession.createProducer(atestq);
@@ -544,6 +548,11 @@ public class XaTimeoutTest extends UnitTestCase
       public Collection<Queue> getDistinctQueues()
       {
          return Collections.emptySet();
+      }
+      
+      public List<MessageReference> getRelatedMessageReferences()
+      {
+         return null;
       }
    }
 }

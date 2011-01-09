@@ -19,9 +19,13 @@ import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.HornetQException;
-import org.hornetq.api.core.Pair;
+import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.jms.JMSFactoryType;
+import org.hornetq.core.config.Configuration;
+import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.config.impl.Validators;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.jms.server.JMSServerConfigParser;
@@ -63,6 +67,10 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
 
    // Public --------------------------------------------------------
 
+   public JMSServerConfigParserImpl()
+   {
+   }
+
    /**
     * Parse the JMS Configuration XML as a JMSConfiguration object
     */
@@ -83,6 +91,7 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
       ArrayList<JMSQueueConfiguration> queues = new ArrayList<JMSQueueConfiguration>();
       ArrayList<TopicConfiguration> topics = new ArrayList<TopicConfiguration>();
       ArrayList<ConnectionFactoryConfiguration> cfs = new ArrayList<ConnectionFactoryConfiguration>();
+      String domain = ConfigurationImpl.DEFAULT_JMX_DOMAIN;
 
       Element e = (Element)rootnode;
 
@@ -90,7 +99,7 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
 
       String elements[] = new String[] { JMSServerDeployer.QUEUE_NODE_NAME,
                                         JMSServerDeployer.TOPIC_NODE_NAME,
-                                        JMSServerDeployer.CONNECTION_FACTORY_NODE_NAME };
+                                        JMSServerDeployer.CONNECTION_FACTORY_NODE_NAME};
       for (String element : elements)
       {
          NodeList children = e.getElementsByTagName(element);
@@ -119,7 +128,10 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
          }
       }
 
-      JMSConfiguration value = newConfig(queues, topics, cfs);
+      domain = XMLConfigurationUtil.getString(e, JMSServerDeployer.JMX_DOMAIN_NAME, ConfigurationImpl.DEFAULT_JMX_DOMAIN, Validators.NO_CHECK);
+
+
+      JMSConfiguration value = newConfig(queues, topics, cfs, domain);
 
       return value;
    }
@@ -188,6 +200,32 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
       return newQueue(queueName, selectorString, durable, jndiArray);
    }
 
+   // private void lookupDiscovery(final String discoveryGroupName, final ConnectionFactoryConfiguration cfConfig)
+   // throws HornetQException
+   // {
+   // Configuration configuration = server.getConfiguration();
+   //
+   // DiscoveryGroupConfiguration discoveryGroupConfiguration = configuration.getDiscoveryGroupConfigurations()
+   // .get(cfConfig.getDiscoveryGroupName());
+   //
+   // if (discoveryGroupConfiguration == null)
+   // {
+   // JMSServerManagerImpl.log.warn("There is no discovery group with name '" + cfConfig.getDiscoveryGroupName() +
+   // "' deployed.");
+   //
+   // throw new HornetQException(HornetQException.ILLEGAL_STATE,
+   // "There is no discovery group with name '" + cfConfig.getDiscoveryGroupName() +
+   // "' deployed.");
+   // }
+   //
+   // cfConfig.setLocalBindAddress(discoveryGroupConfiguration.getLocalBindAddress());
+   // cfConfig.setDiscoveryAddress(discoveryGroupConfiguration.getGroupAddress());
+   // cfConfig.setDiscoveryPort(discoveryGroupConfiguration.getGroupPort());
+   // cfConfig.setDiscoveryRefreshTimeout(discoveryGroupConfiguration.getRefreshTimeout());
+   //
+   //      
+   // }
+
    /**
     * Parse the Connection Configuration node as a ConnectionFactoryConfiguration object
     * @param node
@@ -205,6 +243,13 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
       Element e = (Element)node;
 
       String name = node.getAttributes().getNamedItem(JMSServerConfigParserImpl.NAME_ATTR).getNodeValue();
+      
+      String fact = e.getAttribute("signature");
+      boolean isXA = XMLConfigurationUtil.getBoolean(e,
+                                                     "xa",
+                                                     HornetQClient.DEFAULT_XA);
+
+      JMSFactoryType factType = resolveFactoryType(fact, isXA);
 
       long clientFailureCheckPeriod = XMLConfigurationUtil.getLong(e,
                                                                    "client-failure-check-period",
@@ -254,6 +299,11 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
                                                                 "min-large-message-size",
                                                                 HornetQClient.DEFAULT_MIN_LARGE_MESSAGE_SIZE,
                                                                 Validators.GT_ZERO);
+      
+      boolean compressLargeMessages = XMLConfigurationUtil.getBoolean(e,
+                                                                "compress-large-messages",
+                                                                HornetQClient.DEFAULT_COMPRESS_LARGE_MESSAGES);
+      
       boolean blockOnAcknowledge = XMLConfigurationUtil.getBoolean(e,
                                                                    "block-on-acknowledge",
                                                                    HornetQClient.DEFAULT_BLOCK_ON_ACKNOWLEDGE);
@@ -287,9 +337,6 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
                                                                             "failover-on-initial-connection",
                                                                             HornetQClient.DEFAULT_FAILOVER_ON_INITIAL_CONNECTION);
 
-      boolean failoverOnServerShutdown = XMLConfigurationUtil.getBoolean(e,
-                                                                         "failover-on-server-shutdown",
-                                                                         HornetQClient.DEFAULT_FAILOVER_ON_SERVER_SHUTDOWN);
       boolean useGlobalPools = XMLConfigurationUtil.getBoolean(e,
                                                                "use-global-pools",
                                                                HornetQClient.DEFAULT_USE_GLOBAL_POOLS);
@@ -305,14 +352,11 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
                                                                                      "connection-load-balancing-policy-class-name",
                                                                                      HornetQClient.DEFAULT_CONNECTION_LOAD_BALANCING_POLICY_CLASS_NAME,
                                                                                      Validators.NOT_NULL_OR_EMPTY);
-      long discoveryInitialWaitTimeout = XMLConfigurationUtil.getLong(e,
-                                                                      "discovery-initial-wait-timeout",
-                                                                      HornetQClient.DEFAULT_DISCOVERY_INITIAL_WAIT_TIMEOUT,
-                                                                      Validators.GT_ZERO);
+      boolean ha = XMLConfigurationUtil.getBoolean(e, "ha", HornetQClient.DEFAULT_HA);
 
       String groupid = XMLConfigurationUtil.getString(e, "group-id", null, Validators.NO_CHECK);
       List<String> jndiBindings = new ArrayList<String>();
-      List<Pair<String, String>> connectorNames = new ArrayList<Pair<String, String>>();
+      List<String> connectorNames = new ArrayList<String>();
       String discoveryGroupName = null;
 
       NodeList children = node.getChildNodes();
@@ -345,16 +389,7 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
                {
                   String connectorName = entry.getAttributes().getNamedItem("connector-name").getNodeValue();
 
-                  String backupConnectorName = null;
-
-                  Node backupNode = entry.getAttributes().getNamedItem("backup-connector-name");
-                  if (backupNode != null)
-                  {
-                     backupConnectorName = backupNode.getNodeValue();
-                  }
-
-                  connectorNames.add(new Pair<String, String>(connectorName, backupConnectorName));
-
+                  connectorNames.add(connectorName);
                }
             }
          }
@@ -371,22 +406,29 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
 
       if (discoveryGroupName != null)
       {
-         cfConfig = new ConnectionFactoryConfigurationImpl(name, strbindings);
-         cfConfig.setInitialWaitTimeout(discoveryInitialWaitTimeout);
+         cfConfig = new ConnectionFactoryConfigurationImpl(name,
+                                                           ha,
+                                                           strbindings);
          cfConfig.setDiscoveryGroupName(discoveryGroupName);
       }
       else
       {
-         cfConfig = new ConnectionFactoryConfigurationImpl(name, strbindings);
-         cfConfig.setConnectorNames(connectorNames);
+         ArrayList<String> connectors = new ArrayList<String>(connectorNames.size());
+         for (String connectorName : connectorNames)
+         {
+            connectors.add(connectorName);
+         }
+         cfConfig = new ConnectionFactoryConfigurationImpl(name, ha, connectors, strbindings);
       }
 
+      cfConfig.setFactoryType(factType);
       cfConfig.setClientID(clientID);
       cfConfig.setClientFailureCheckPeriod(clientFailureCheckPeriod);
       cfConfig.setConnectionTTL(connectionTTL);
       cfConfig.setCallTimeout(callTimeout);
       cfConfig.setCacheLargeMessagesClient(cacheLargeMessagesClient);
       cfConfig.setMinLargeMessageSize(minLargeMessageSize);
+      cfConfig.setCompressLargeMessages(compressLargeMessages);
       cfConfig.setConsumerWindowSize(consumerWindowSize);
       cfConfig.setConsumerMaxRate(consumerMaxRate);
       cfConfig.setConfirmationWindowSize(confirmationWindowSize);
@@ -407,10 +449,49 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
       cfConfig.setRetryIntervalMultiplier(retryIntervalMultiplier);
       cfConfig.setMaxRetryInterval(maxRetryInterval);
       cfConfig.setReconnectAttempts(reconnectAttempts);
-      cfConfig.setFailoverOnServerShutdown(failoverOnServerShutdown);
       cfConfig.setFailoverOnInitialConnection(failoverOnInitialConnection);
       cfConfig.setGroupID(groupid);
       return cfConfig;
+   }
+
+   private JMSFactoryType resolveFactoryType(String fact, boolean isXA) throws HornetQException
+   {
+      if ("".equals(fact))
+      {
+         fact = "generic";
+      }
+      if (isXA)
+      {
+         if ("generic".equals(fact))
+         {
+            return JMSFactoryType.XA_CF;
+         }
+         if ("queue".equals(fact))
+         {
+            return JMSFactoryType.QUEUE_XA_CF;
+         }
+         if ("topic".equals(fact))
+         {
+            return JMSFactoryType.TOPIC_XA_CF;
+         }
+      }
+      else
+      {
+         if ("generic".equals(fact))
+         {
+            return JMSFactoryType.CF;
+         }
+         if ("queue".equals(fact))
+         {
+            return JMSFactoryType.QUEUE_CF;
+         }
+         if ("topic".equals(fact))
+         {
+            return JMSFactoryType.TOPIC_CF;
+         }
+      }
+      throw new HornetQException(HornetQException.INTERNAL_ERROR, "Invalid signature " + fact +
+      " at parseConnectionFactory");
    }
 
    /**
@@ -445,13 +526,14 @@ public class JMSServerConfigParserImpl implements JMSServerConfigParser
     * @param queues
     * @param topics
     * @param cfs
+    * @param domain
     * @return
     */
    protected JMSConfiguration newConfig(final ArrayList<JMSQueueConfiguration> queues,
                                         final ArrayList<TopicConfiguration> topics,
-                                        final ArrayList<ConnectionFactoryConfiguration> cfs)
+                                        final ArrayList<ConnectionFactoryConfiguration> cfs, String domain)
    {
-      JMSConfiguration value = new JMSConfigurationImpl(cfs, queues, topics);
+      JMSConfiguration value = new JMSConfigurationImpl(cfs, queues, topics, domain);
       return value;
    }
 

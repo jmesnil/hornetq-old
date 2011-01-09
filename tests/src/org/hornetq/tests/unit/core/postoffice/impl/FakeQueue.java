@@ -20,6 +20,7 @@ import java.util.concurrent.Executor;
 
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.core.filter.Filter;
+import org.hornetq.core.paging.cursor.PageSubscription;
 import org.hornetq.core.server.Consumer;
 import org.hornetq.core.server.MessageReference;
 import org.hornetq.core.server.Queue;
@@ -36,6 +37,9 @@ import org.hornetq.core.transaction.Transaction;
  */
 public class FakeQueue implements Queue
 {
+   
+   PageSubscription subs;
+   
    public boolean isDirectDeliver()
    {
       // TODO Auto-generated method stub
@@ -91,10 +95,18 @@ public class FakeQueue implements Queue
    }
 
    private final SimpleString name;
+   
+   private final long id;
 
    public FakeQueue(final SimpleString name)
    {
+      this(name, 0);
+   }
+   
+   public FakeQueue(final SimpleString name, final long id)
+   {
       this.name = name;
+      this.id = id;
    }
 
    /* (non-Javadoc)
@@ -325,7 +337,7 @@ public class FakeQueue implements Queue
    /* (non-Javadoc)
     * @see org.hornetq.core.server.Queue#getMessageCount()
     */
-   public int getMessageCount()
+   public long getMessageCount()
    {
       // TODO Auto-generated method stub
       return 0;
@@ -348,13 +360,18 @@ public class FakeQueue implements Queue
       return name;
    }
 
+   public SimpleString getAddress()
+   {
+      // TODO Auto-generated method stub
+      return null;
+   }
+   
    /* (non-Javadoc)
     * @see org.hornetq.core.server.Queue#getID()
     */
    public long getID()
    {
-      // TODO Auto-generated method stub
-      return 0;
+      return id;
    }
 
    /* (non-Javadoc)
@@ -589,6 +606,19 @@ public class FakeQueue implements Queue
    {
       // TODO Auto-generated method stub
       
+   }
+
+   /* (non-Javadoc)
+    * @see org.hornetq.core.server.Queue#getPageSubscription()
+    */
+   public PageSubscription getPageSubscription()
+   {
+      return subs;
+   }
+   
+   public void setPageSubscription(PageSubscription sub)
+   {
+      this.subs = sub;
    }
 
 }

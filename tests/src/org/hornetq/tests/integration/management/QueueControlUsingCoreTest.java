@@ -20,10 +20,12 @@ import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.api.core.management.QueueControl;
 import org.hornetq.api.core.management.ResourceNames;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
+import org.hornetq.tests.util.UnitTestCase;
 
 /**
  * A QueueControlTest
@@ -41,6 +43,8 @@ public class QueueControlUsingCoreTest extends QueueControlTest
    // Attributes ----------------------------------------------------
 
    protected ClientSession session;
+
+   private ServerLocator locator;
 
    // Static --------------------------------------------------------
 
@@ -65,9 +69,9 @@ public class QueueControlUsingCoreTest extends QueueControlTest
             return (Integer)proxy.invokeOperation("changeMessagesPriority", filter, newPriority);
          }
 
-         public int countMessages(final String filter) throws Exception
+         public long countMessages(final String filter) throws Exception
          {
-            return (Integer)proxy.invokeOperation("countMessages", filter);
+            return ((Number)proxy.invokeOperation("countMessages", filter)).longValue();
          }
 
          public boolean expireMessage(final long messageID) throws Exception
@@ -110,9 +114,9 @@ public class QueueControlUsingCoreTest extends QueueControlTest
             return (String)proxy.retrieveAttributeValue("filter");
          }
 
-         public int getMessageCount()
+         public long getMessageCount()
          {
-            return (Integer)proxy.retrieveAttributeValue("messageCount");
+            return ((Number)proxy.retrieveAttributeValue("messageCount")).longValue();
          }
 
          public long getMessagesAdded()
@@ -257,6 +261,11 @@ public class QueueControlUsingCoreTest extends QueueControlTest
             return (Boolean)proxy.invokeOperation("isPaused");
          }
 
+         public String listConsumersAsJSON() throws Exception
+         {
+            return (String)proxy.invokeOperation("listConsumersAsJSON");
+         }
+
       };
    }
 
@@ -269,7 +278,8 @@ public class QueueControlUsingCoreTest extends QueueControlTest
    {
       super.setUp();
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      ClientSessionFactory sf = locator.createSessionFactory();
       session = sf.createSession(false, true, true);
       session.start();
    }
@@ -280,6 +290,11 @@ public class QueueControlUsingCoreTest extends QueueControlTest
       if (session != null)
       {
          session.close();
+      }
+
+      if(locator != null)
+      {
+         locator.close();
       }
 
       session = null;

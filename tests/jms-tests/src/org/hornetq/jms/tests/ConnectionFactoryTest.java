@@ -28,7 +28,14 @@ import javax.jms.TextMessage;
 import javax.jms.Topic;
 import javax.jms.TopicConnection;
 import javax.jms.TopicConnectionFactory;
+import javax.jms.XAConnection;
+import javax.jms.XAConnectionFactory;
+import javax.jms.XAQueueConnection;
+import javax.jms.XAQueueConnectionFactory;
+import javax.jms.XATopicConnection;
+import javax.jms.XATopicConnectionFactory;
 
+import org.hornetq.jms.client.HornetQConnectionFactory;
 import org.hornetq.jms.tests.util.ProxyAssertSupport;
 
 /**
@@ -62,7 +69,7 @@ public class ConnectionFactoryTest extends JMSTestCase
     */
    public void testQueueConnectionFactory() throws Exception
    {
-      QueueConnectionFactory qcf = (QueueConnectionFactory)JMSTestCase.ic.lookup("/ConnectionFactory");
+      QueueConnectionFactory qcf = (QueueConnectionFactory)JMSTestCase.ic.lookup("/CF_QUEUE_XA_FALSE");
       QueueConnection qc = qcf.createQueueConnection();
       qc.close();
    }
@@ -73,7 +80,7 @@ public class ConnectionFactoryTest extends JMSTestCase
     */
    public void testTopicConnectionFactory() throws Exception
    {
-      TopicConnectionFactory qcf = (TopicConnectionFactory)JMSTestCase.ic.lookup("/ConnectionFactory");
+      TopicConnectionFactory qcf = (TopicConnectionFactory)JMSTestCase.ic.lookup("/CF_TOPIC_XA_FALSE");
       TopicConnection tc = qcf.createTopicConnection();
       tc.close();
    }
@@ -107,7 +114,7 @@ public class ConnectionFactoryTest extends JMSTestCase
       // the ConnectionFactories that ship with HornetQ do not have their clientID
       // administratively configured.
 
-      ConnectionFactory cf = (ConnectionFactory)JMSTestCase.ic.lookup("/ConnectionFactory");
+      ConnectionFactory cf = (ConnectionFactory)JMSTestCase.ic.lookup("/CF_XA_FALSE");
       Connection c = cf.createConnection();
 
       ProxyAssertSupport.assertNull(c.getClientID());
@@ -120,7 +127,7 @@ public class ConnectionFactoryTest extends JMSTestCase
       // the ConnectionFactories that ship with HornetQ do not have their clientID
       // administratively configured.
 
-      ConnectionFactory cf = (ConnectionFactory)JMSTestCase.ic.lookup("/ConnectionFactory");
+      ConnectionFactory cf = (ConnectionFactory)JMSTestCase.ic.lookup("/CF_XA_FALSE");
       Connection c = cf.createConnection();
 
       // set the client id immediately after the connection is created
@@ -319,6 +326,205 @@ public class ConnectionFactoryTest extends JMSTestCase
 
       }
 
+   }
+   
+   public void testFactoryTypes() throws Exception
+   {
+      HornetQConnectionFactory factory = null;
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/ConnectionFactory");
+      
+      assertTrue(factory instanceof ConnectionFactory);
+      assertEquals(3, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_XA_TRUE");
+      
+      assertTrue(factory instanceof XAConnectionFactory);
+      assertEquals(6, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_XA_FALSE");
+      
+      assertTrue(factory instanceof ConnectionFactory);
+      assertEquals(3, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_GENERIC");
+      
+      assertTrue(factory instanceof ConnectionFactory);
+      assertEquals(3, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_GENERIC_XA_TRUE");
+      
+      assertTrue(factory instanceof XAConnectionFactory);
+      assertEquals(6, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_GENERIC_XA_FALSE");
+      
+      assertTrue(factory instanceof ConnectionFactory);
+      assertEquals(3, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_QUEUE");
+      
+      assertTrue(factory instanceof QueueConnectionFactory);
+      assertEquals(2, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_QUEUE_XA_TRUE");
+      
+      assertTrue(factory instanceof XAQueueConnectionFactory);
+      assertEquals(4, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_QUEUE_XA_FALSE");
+      
+      assertTrue(factory instanceof QueueConnectionFactory);
+      assertEquals(2, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_TOPIC");
+      
+      assertTrue(factory instanceof TopicConnectionFactory);
+      assertEquals(2, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_TOPIC_XA_TRUE");
+      
+      assertTrue(factory instanceof XATopicConnectionFactory);
+      assertEquals(4, getTypes(factory));
+      
+      factory = (HornetQConnectionFactory)JMSTestCase.ic.lookup("/CF_TOPIC_XA_FALSE");
+      
+      assertTrue(factory instanceof TopicConnectionFactory);
+      assertEquals(2, getTypes(factory));
+   }
+   
+   public void testConnectionTypes() throws Exception
+   {
+      Connection genericConnection = null;
+      XAConnection xaConnection = null;
+      QueueConnection queueConnection = null;
+      TopicConnection topicConnection = null;
+      XAQueueConnection xaQueueConnection = null;
+      XATopicConnection xaTopicConnection = null;
+
+      ConnectionFactory genericFactory = (ConnectionFactory)JMSTestCase.ic.lookup("/ConnectionFactory");
+      genericConnection = genericFactory.createConnection();
+      assertConnectionType(genericConnection, "generic");
+
+      XAConnectionFactory xaFactory = (XAConnectionFactory)JMSTestCase.ic.lookup("/CF_XA_TRUE");
+      xaConnection = xaFactory.createXAConnection();
+      assertConnectionType(xaConnection, "xa");
+
+      QueueConnectionFactory queueCF = (QueueConnectionFactory)JMSTestCase.ic.lookup("/CF_QUEUE");
+      queueConnection = queueCF.createQueueConnection();
+      assertConnectionType(queueConnection, "queue");
+
+      TopicConnectionFactory topicCF = (TopicConnectionFactory)JMSTestCase.ic.lookup("/CF_TOPIC");
+      topicConnection = topicCF.createTopicConnection();
+      assertConnectionType(topicConnection, "topic");
+
+      XAQueueConnectionFactory xaQueueCF = (XAQueueConnectionFactory)JMSTestCase.ic.lookup("/CF_QUEUE_XA_TRUE");
+      xaQueueConnection = xaQueueCF.createXAQueueConnection();
+      assertConnectionType(xaQueueConnection, "xa-queue");
+
+      XATopicConnectionFactory xaTopicCF = (XATopicConnectionFactory)JMSTestCase.ic.lookup("/CF_TOPIC_XA_TRUE");
+      xaTopicConnection = xaTopicCF.createXATopicConnection();
+      assertConnectionType(xaTopicConnection, "xa-topic");
+
+      genericConnection.close();
+      xaConnection.close();
+      queueConnection.close();
+      topicConnection.close();
+      xaQueueConnection.close();
+      xaTopicConnection.close();
+   }
+
+   private void assertConnectionType(Connection conn, String type)
+   {
+      if ("generic".equals(type))
+      {
+         //generic
+         assertTrue(conn instanceof Connection);
+         assertFalse(conn instanceof XAConnection);
+         assertTrue(conn instanceof QueueConnection);
+         assertFalse(conn instanceof XAQueueConnection);
+         assertTrue(conn instanceof TopicConnection);
+         assertFalse(conn instanceof XATopicConnection);
+      }
+      else if ("queue".equals(type))
+      {
+         assertTrue(conn instanceof Connection);
+         assertFalse(conn instanceof XAConnection);
+         assertTrue(conn instanceof QueueConnection);
+         assertFalse(conn instanceof XAQueueConnection);
+         assertTrue(conn instanceof TopicConnection);
+         assertFalse(conn instanceof XATopicConnection);
+      }
+      else if ("topic".equals(type))
+      {
+         assertTrue(conn instanceof Connection);
+         assertFalse(conn instanceof XAConnection);
+         assertTrue(conn instanceof QueueConnection);
+         assertFalse(conn instanceof XAQueueConnection);
+         assertTrue(conn instanceof TopicConnection);
+         assertFalse(conn instanceof XATopicConnection);
+      }
+      else if ("xa".equals(type))
+      {
+         assertTrue(conn instanceof Connection);
+         assertTrue(conn instanceof XAConnection);
+         assertTrue(conn instanceof QueueConnection);
+         assertFalse(conn instanceof XAQueueConnection);
+         assertTrue(conn instanceof TopicConnection);
+         assertFalse(conn instanceof XATopicConnection);
+      }
+      else if ("xa-queue".equals(type))
+      {
+         assertTrue(conn instanceof Connection);
+         assertTrue(conn instanceof XAConnection);
+         assertTrue(conn instanceof QueueConnection);
+         assertTrue(conn instanceof XAQueueConnection);
+         assertTrue(conn instanceof TopicConnection);
+         assertFalse(conn instanceof XATopicConnection);
+      }
+      else if ("xa-topic".equals(type))
+      {
+         assertTrue(conn instanceof Connection);
+         assertTrue(conn instanceof XAConnection);
+         assertTrue(conn instanceof QueueConnection);
+         assertFalse(conn instanceof XAQueueConnection);
+         assertTrue(conn instanceof TopicConnection);
+         assertTrue(conn instanceof XATopicConnection);
+      }
+      else
+      {
+         fail("Unknown connection type: " + type);
+      }
+   }
+
+   private int getTypes(HornetQConnectionFactory factory)
+   {
+      int num = 0;
+      if (factory instanceof ConnectionFactory)
+      {
+         num++;
+      }
+      if (factory instanceof XAConnectionFactory)
+      {
+         num++;
+      }
+      if (factory instanceof QueueConnectionFactory)
+      {
+         num++;
+      }
+      if (factory instanceof TopicConnectionFactory)
+      {
+         num++;
+      }
+      if (factory instanceof XAQueueConnectionFactory)
+      {
+         num++;
+      }
+      if (factory instanceof XATopicConnectionFactory)
+      {
+         num++;
+      }
+      return num;
    }
 
    // Package protected ---------------------------------------------

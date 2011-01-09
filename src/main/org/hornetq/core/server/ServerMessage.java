@@ -13,7 +13,6 @@
 
 package org.hornetq.core.server;
 
-import org.hornetq.api.core.SimpleString;
 import org.hornetq.core.journal.EncodingSupport;
 import org.hornetq.core.message.impl.MessageInternal;
 import org.hornetq.core.paging.PagingStore;
@@ -56,11 +55,11 @@ public interface ServerMessage extends MessageInternal, EncodingSupport
 
    PagingStore getPagingStore();
 
-   boolean page() throws Exception;
-
-   boolean page(long transactionID) throws Exception;
-
    boolean storeIsPaging();
 
    void encodeMessageIDToBuffer();
+   
+   byte [] getDuplicateIDBytes();
+   
+   Object getDuplicateProperty();
 }

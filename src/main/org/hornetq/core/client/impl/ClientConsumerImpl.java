@@ -82,7 +82,7 @@ public class ClientConsumerImpl implements ClientConsumerInternal
 
    private final Runner runner = new Runner();
 
-   private LargeMessageBufferImpl currentLargeMessageBuffer;
+   private LargeMessageControllerImpl currentLargeMessageController;
 
    // When receiving LargeMessages, the user may choose to not read the body, on this case we need to discard the body
    // before moving to the next message.
@@ -101,8 +101,6 @@ public class ClientConsumerImpl implements ClientConsumerInternal
    private volatile boolean closed;
 
    private volatile int creditsToSend;
-
-   private volatile boolean slowConsumerInitialCreditSent = false;
 
    private volatile Exception lastException;
 
@@ -166,7 +164,7 @@ public class ClientConsumerImpl implements ClientConsumerInternal
       if (largeMessageReceived != null)
       {
          // Check if there are pending packets to be received
-         largeMessageReceived.discardLargeBody();
+         largeMessageReceived.discardBody();
          largeMessageReceived = null;
       }
 
@@ -280,7 +278,7 @@ public class ClientConsumerImpl implements ClientConsumerInternal
 
                if (expired)
                {
-                  m.discardLargeBody();
+                  m.discardBody();
 
                   session.expire(id, m.getMessageID());
 
@@ -321,7 +319,19 @@ public class ClientConsumerImpl implements ClientConsumerInternal
 
    public ClientMessage receive(final long timeout) throws HornetQException
    {
-      return receive(timeout, false);
+      if (isBrowseOnly())
+      {
+         ClientMessage msg = receive(timeout, false);
+         if (msg == null)
+         {
+            msg = receive(0, true);
+         }
+         return msg;
+      }
+      else
+      {
+         return receive(timeout, false);
+      }
    }
 
    public ClientMessage receive() throws HornetQException
@@ -442,6 +452,11 @@ public class ClientConsumerImpl implements ClientConsumerInternal
    // ClientConsumerInternal implementation
    // --------------------------------------------------------------
 
+   public ClientSessionInternal getSession()
+   {
+      return session;
+   }
+   
    public SessionQueueQueryResponseMessage getQueueInfo()
    {
       return queueInfo;
@@ -521,15 +536,9 @@ public class ClientConsumerImpl implements ClientConsumerInternal
 
       flowControl(packet.getPacketSize(), false);
 
-      ClientMessageInternal currentChunkMessage = new ClientMessageImpl();
+      ClientLargeMessageInternal currentChunkMessage = (ClientLargeMessageInternal)packet.getLargeMessage();
 
       currentChunkMessage.setDeliveryCount(packet.getDeliveryCount());
-
-      // FIXME - this is really inefficient - decoding from a buffer to a byte[] then from the byte[] to another buffer
-      // which is then decoded to form the message! Clebert, what were you thinking?
-      currentChunkMessage.decodeHeadersAndProperties(HornetQBuffers.wrappedBuffer(packet.getLargeMessageHeader()));
-
-      currentChunkMessage.setLargeMessage(true);
 
       File largeMessageCache = null;
 
@@ -540,9 +549,16 @@ public class ClientConsumerImpl implements ClientConsumerInternal
          largeMessageCache.deleteOnExit();
       }
 
-      currentLargeMessageBuffer = new LargeMessageBufferImpl(this, packet.getLargeMessageSize(), 60, largeMessageCache);
+      currentLargeMessageController = new LargeMessageControllerImpl(this, packet.getLargeMessageSize(), 60, largeMessageCache);
 
-      currentChunkMessage.setBuffer(currentLargeMessageBuffer);
+      if (currentChunkMessage.isCompressed())
+      {
+         currentChunkMessage.setLargeMessageController(new CompressedLargeMessageControllerImpl(currentLargeMessageController));
+      }
+      else
+      {
+         currentChunkMessage.setLargeMessageController(currentLargeMessageController);
+      }
 
       currentChunkMessage.setFlowControlSize(0);
 
@@ -555,7 +571,7 @@ public class ClientConsumerImpl implements ClientConsumerInternal
       {
          return;
       }
-      currentLargeMessageBuffer.addPacket(chunk);
+      currentLargeMessageController.addPacket(chunk);
    }
 
    public void clear(boolean waitForOnMessage) throws HornetQException
@@ -649,15 +665,16 @@ public class ClientConsumerImpl implements ClientConsumerInternal
                   ClientConsumerImpl.log.trace("Sending " + creditsToSend + " -1, for slow consumer");
                }
 
-               slowConsumerInitialCreditSent = false;
-
                // sending the credits - 1 initially send to fire the slow consumer, or the slow consumer would be
                // always buffering one after received the first message
                final int credits = creditsToSend - 1;
 
                creditsToSend = 0;
 
-               sendCredits(credits);
+               if (credits > 0)
+               {
+                  sendCredits(credits);
+               }
             }
             else
             {
@@ -670,7 +687,10 @@ public class ClientConsumerImpl implements ClientConsumerInternal
 
                creditsToSend = 0;
 
-               sendCredits(credits);
+               if (credits > 0)
+               {
+                  sendCredits(credits);
+               }
             }
          }
       }
@@ -693,22 +713,17 @@ public class ClientConsumerImpl implements ClientConsumerInternal
     * */
    private void startSlowConsumer()
    {
-      if (!slowConsumerInitialCreditSent)
+      if (ClientConsumerImpl.trace)
       {
-         if (ClientConsumerImpl.trace)
-         {
-            ClientConsumerImpl.log.trace("Sending 1 credit to start delivering of one message to slow consumer");
-         }
-         slowConsumerInitialCreditSent = true;
-         sendCredits(1);
+         ClientConsumerImpl.log.trace("Sending 1 credit to start delivering of one message to slow consumer");
       }
+      sendCredits(1);
    }
 
    private void resetIfSlowConsumer()
    {
       if (clientWindowSize == 0)
       {
-         slowConsumerInitialCreditSent = false;
          sendCredits(0);
       }
    }
@@ -832,7 +847,7 @@ public class ClientConsumerImpl implements ClientConsumerInternal
 
                if (message.isLargeMessage())
                {
-                  message.discardLargeBody();
+                  message.discardBody();
                }
             }
             else
@@ -879,10 +894,10 @@ public class ClientConsumerImpl implements ClientConsumerInternal
          // Now we wait for any current handler runners to run.
          waitForOnMessageToComplete(true);
 
-         if (currentLargeMessageBuffer != null)
+         if (currentLargeMessageController != null)
          {
-            currentLargeMessageBuffer.cancel();
-            currentLargeMessageBuffer = null;
+            currentLargeMessageController.cancel();
+            currentLargeMessageController = null;
          }
 
          closed = true;

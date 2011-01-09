@@ -74,7 +74,9 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       ClientSession session = sf.createSession(false, true, true);
 
@@ -113,6 +115,8 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       sf.close();
 
+      locator.close();
+
       server.stop();
    }
 
@@ -148,7 +152,9 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       Assert.assertEquals(2, bindings.getBindings().size());
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       ClientSession session = sf.createSession(false, true, true);
 
@@ -193,6 +199,8 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       sf.close();
 
+      locator.close();
+
       server.stop();
    }
 
@@ -212,7 +220,9 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       ClientSession session = sf.createSession(false, true, true);
 
@@ -244,7 +254,7 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       server.start();
 
-      sf = HornetQClient.createClientSessionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      sf = locator.createSessionFactory();
 
       session = sf.createSession(false, true, true);
 
@@ -297,6 +307,8 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       sf.close();
 
+      locator.close();
+
       server.stop();
    }
 
@@ -325,7 +337,9 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       ClientSession session = sf.createSession(false, true, true);
 
@@ -356,7 +370,7 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       server.start();
 
-      sf = HornetQClient.createClientSessionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      sf = locator.createSessionFactory();
 
       session = sf.createSession(false, true, true);
 
@@ -385,6 +399,8 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       sf.close();
 
+      locator.close();
+
       server.stop();
    }
 
@@ -410,7 +426,9 @@ public class PredefinedQueueTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       ClientSession session = sf.createSession(false, true, true);
 
@@ -463,6 +481,8 @@ public class PredefinedQueueTest extends ServiceTestBase
       session.close();
 
       sf.close();
+
+      locator.close();
 
       server.stop();
    }

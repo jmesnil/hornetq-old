@@ -35,6 +35,7 @@ import javax.transaction.TransactionManager;
 
 import com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionManagerImple;
 
+import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.security.Role;
 import org.hornetq.core.server.HornetQServer;
@@ -61,7 +62,7 @@ public class HornetQServerTestCase extends ProxyAssertSupport
    protected final Logger log = Logger.getLogger(getClass());
 
    // Static --------------------------------------------------------
-
+  
    /** Some testcases are time sensitive, and we need to make sure a GC would happen before certain scenarios*/
    public static void forceGC()
    {
@@ -318,12 +319,12 @@ public class HornetQServerTestCase extends ProxyAssertSupport
 
    public TopicConnectionFactory getTopicConnectionFactory() throws Exception
    {
-      return (TopicConnectionFactory)getInitialContext().lookup("/ConnectionFactory");
+      return (TopicConnectionFactory)getInitialContext().lookup("/CF_TOPIC");
    }
 
    public XAConnectionFactory getXAConnectionFactory() throws Exception
    {
-      return (XAConnectionFactory)getInitialContext().lookup("/ConnectionFactory");
+      return (XAConnectionFactory)getInitialContext().lookup("/CF_XA_TRUE");
    }
 
    public InitialContext getInitialContext(final int serverid) throws Exception
@@ -383,7 +384,7 @@ public class HornetQServerTestCase extends ProxyAssertSupport
 
    public boolean checkEmpty(final Queue queue) throws Exception
    {
-      Integer messageCount = HornetQServerTestCase.servers.get(0).getMessageCountForQueue(queue.getQueueName());
+      Long messageCount = HornetQServerTestCase.servers.get(0).getMessageCountForQueue(queue.getQueueName());
       if (messageCount > 0)
       {
          removeAllMessages(queue.getQueueName(), true);
@@ -408,7 +409,7 @@ public class HornetQServerTestCase extends ProxyAssertSupport
 
    protected boolean assertRemainingMessages(final int expected) throws Exception
    {
-      Integer messageCount = HornetQServerTestCase.servers.get(0).getMessageCountForQueue("Queue1");
+      Long messageCount = HornetQServerTestCase.servers.get(0).getMessageCountForQueue("Queue1");
 
       ProxyAssertSupport.assertEquals(expected, messageCount.intValue());
       return expected == messageCount.intValue();
@@ -500,7 +501,7 @@ public class HornetQServerTestCase extends ProxyAssertSupport
       return HornetQServerTestCase.servers.get(0).listAllSubscribersForTopic(s);
    }
 
-   protected Integer getMessageCountForQueue(final String s) throws Exception
+   protected Long getMessageCountForQueue(final String s) throws Exception
    {
       return HornetQServerTestCase.servers.get(0).getMessageCountForQueue(s);
    }

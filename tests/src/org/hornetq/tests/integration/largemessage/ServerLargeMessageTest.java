@@ -15,7 +15,14 @@ package org.hornetq.tests.integration.largemessage;
 
 import junit.framework.Assert;
 
-import org.hornetq.api.core.client.*;
+import org.hornetq.api.core.Message;
+import org.hornetq.api.core.client.ClientConsumer;
+import org.hornetq.api.core.client.ClientMessage;
+import org.hornetq.api.core.client.ClientProducer;
+import org.hornetq.api.core.client.ClientSession;
+import org.hornetq.api.core.client.ClientSessionFactory;
+import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.core.persistence.impl.journal.JournalStorageManager;
 import org.hornetq.core.persistence.impl.journal.LargeServerMessageImpl;
 import org.hornetq.core.server.HornetQServer;
@@ -49,7 +56,9 @@ public class ServerLargeMessageTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(false);
+      ServerLocator locator = createFactory(false);
+
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       ClientSession session = sf.createSession(false, false);
 
@@ -63,6 +72,9 @@ public class ServerLargeMessageTest extends ServiceTestBase
          {
             fileMessage.addBytes(new byte[] { UnitTestCase.getSamplebyte(i) });
          }
+         // The server would be doing this
+         fileMessage.putLongProperty(Message.HDR_LARGE_BODY_SIZE, 2 * HornetQClient.DEFAULT_MIN_LARGE_MESSAGE_SIZE);
+
 
          fileMessage.releaseResources();
 
@@ -99,6 +111,7 @@ public class ServerLargeMessageTest extends ServiceTestBase
       finally
       {
          sf.close();
+         locator.close();
          server.stop();
       }
    }

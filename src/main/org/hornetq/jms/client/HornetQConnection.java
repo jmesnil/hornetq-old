@@ -32,11 +32,8 @@ import javax.jms.Session;
 import javax.jms.Topic;
 import javax.jms.TopicConnection;
 import javax.jms.TopicSession;
-import javax.jms.XAConnection;
-import javax.jms.XAQueueConnection;
 import javax.jms.XAQueueSession;
 import javax.jms.XASession;
-import javax.jms.XATopicConnection;
 import javax.jms.XATopicSession;
 
 import org.hornetq.api.core.HornetQException;
@@ -60,8 +57,7 @@ import org.hornetq.utils.VersionLoader;
  *          <p/>
  *          $Id$
  */
-public class HornetQConnection implements Connection, QueueConnection, TopicConnection, XAConnection,
-         XAQueueConnection, XATopicConnection
+public class HornetQConnection implements Connection, TopicConnection, QueueConnection
 {
    // Constants ------------------------------------------------------------------------------------
 
@@ -119,6 +115,8 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
 
    private final Exception creationStack;
 
+   private HornetQConnectionFactory factoryReference;
+
    // Constructors ---------------------------------------------------------------------------------
 
    public HornetQConnection(final String username,
@@ -156,7 +154,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
    {
       checkClosed();
 
-      return createSessionInternal(transacted, acknowledgeMode, false, HornetQConnection.TYPE_GENERIC_CONNECTION);
+      return (Session)createSessionInternal(transacted, acknowledgeMode, false, HornetQConnection.TYPE_GENERIC_CONNECTION);
    }
 
    public String getClientID() throws JMSException
@@ -181,6 +179,16 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
       }
 
       this.clientID = clientID;
+      try
+      {
+         this.addSessionMetaData(initialSession);
+      }
+      catch (HornetQException e)
+      {
+         JMSException ex = new JMSException("Internal error setting metadata jms-client-id");
+         ex.setLinkedException(e);
+         throw ex;
+      }
 
       justCreated = false;
    }
@@ -342,7 +350,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
    public QueueSession createQueueSession(final boolean transacted, final int acknowledgeMode) throws JMSException
    {
       checkClosed();
-      return createSessionInternal(transacted, acknowledgeMode, false, HornetQSession.TYPE_QUEUE_SESSION);
+      return (QueueSession)createSessionInternal(transacted, acknowledgeMode, false, HornetQSession.TYPE_QUEUE_SESSION);
    }
 
    public ConnectionConsumer createConnectionConsumer(final Queue queue,
@@ -360,7 +368,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
    public TopicSession createTopicSession(final boolean transacted, final int acknowledgeMode) throws JMSException
    {
       checkClosed();
-      return createSessionInternal(transacted, acknowledgeMode, false, HornetQSession.TYPE_TOPIC_SESSION);
+      return (TopicSession)createSessionInternal(transacted, acknowledgeMode, false, HornetQSession.TYPE_TOPIC_SESSION);
    }
 
    public ConnectionConsumer createConnectionConsumer(final Topic topic,
@@ -378,7 +386,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
    public XASession createXASession() throws JMSException
    {
       checkClosed();
-      return createSessionInternal(true, Session.SESSION_TRANSACTED, true, HornetQSession.TYPE_GENERIC_SESSION);
+      return (XASession)createSessionInternal(true, Session.SESSION_TRANSACTED, true, HornetQSession.TYPE_GENERIC_SESSION);
    }
 
    // XAQueueConnection implementation -------------------------------------------------------------
@@ -386,7 +394,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
    public XAQueueSession createXAQueueSession() throws JMSException
    {
       checkClosed();
-      return createSessionInternal(true, Session.SESSION_TRANSACTED, true, HornetQSession.TYPE_QUEUE_SESSION);
+      return (XAQueueSession)createSessionInternal(true, Session.SESSION_TRANSACTED, true, HornetQSession.TYPE_QUEUE_SESSION);
 
    }
 
@@ -395,7 +403,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
    public XATopicSession createXATopicSession() throws JMSException
    {
       checkClosed();
-      return createSessionInternal(true, Session.SESSION_TRANSACTED, true, HornetQSession.TYPE_TOPIC_SESSION);
+      return (XATopicSession)createSessionInternal(true, Session.SESSION_TRANSACTED, true, HornetQSession.TYPE_TOPIC_SESSION);
 
    }
 
@@ -460,7 +468,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
       }
    }
 
-   protected HornetQSession createSessionInternal(final boolean transacted,
+   private Object createSessionInternal(final boolean transacted,
                                                   int acknowledgeMode,
                                                   final boolean isXA,
                                                   final int type) throws JMSException
@@ -481,7 +489,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
                                                    isXA,
                                                    false,
                                                    false,
-                                                   sessionFactory.isPreAcknowledge(),
+                                                   sessionFactory.getServerLocator().isPreAcknowledge(),
                                                    transactionBatchSize);
          }
          else if (acknowledgeMode == Session.AUTO_ACKNOWLEDGE)
@@ -491,7 +499,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
                                                    isXA,
                                                    true,
                                                    true,
-                                                   sessionFactory.isPreAcknowledge(),
+                                                   sessionFactory.getServerLocator().isPreAcknowledge(),
                                                    0);
          }
          else if (acknowledgeMode == Session.DUPS_OK_ACKNOWLEDGE)
@@ -501,7 +509,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
                                                    isXA,
                                                    true,
                                                    true,
-                                                   sessionFactory.isPreAcknowledge(),
+                                                   sessionFactory.getServerLocator().isPreAcknowledge(),
                                                    dupsOKBatchSize);
          }
          else if (acknowledgeMode == Session.CLIENT_ACKNOWLEDGE)
@@ -511,7 +519,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
                                                    isXA,
                                                    true,
                                                    false,
-                                                   sessionFactory.isPreAcknowledge(),
+                                                   sessionFactory.getServerLocator().isPreAcknowledge(),
                                                    transactionBatchSize);
          }
          else if (acknowledgeMode == HornetQJMSConstants.PRE_ACKNOWLEDGE)
@@ -528,8 +536,20 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
          // Setting multiple times on different sessions doesn't matter since RemotingConnection maintains
          // a set (no duplicates)
          session.addFailureListener(listener);
+         
+         
+         
 
-         HornetQSession jbs = new HornetQSession(this, transacted, isXA, acknowledgeMode, session, type);
+         HornetQSession jbs;
+         
+         if (isXA)
+         {
+            jbs = new HornetQXASession(this, transacted, isXA, acknowledgeMode, session, type);
+         }
+         else
+         {
+            jbs = new HornetQSession(this, transacted, isXA, acknowledgeMode, session, type);
+         }
 
          sessions.add(jbs);
 
@@ -537,6 +557,8 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
          {
             session.start();
          }
+         
+         this.addSessionMetaData(session);
 
          return jbs;
       }
@@ -562,12 +584,28 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
       {
          initialSession = sessionFactory.createSession(username, password, false, false, false, false, 0);
 
+         addSessionMetaData(initialSession);
+
          initialSession.addFailureListener(listener);
       }
       catch (HornetQException me)
       {
          throw JMSExceptionHelper.convertFromHornetQException(me);
       }
+   }
+
+   private void addSessionMetaData(ClientSession session) throws HornetQException
+   {
+      session.addMetaData("jms-session", "");
+      if (clientID != null)
+      {
+         session.addMetaData("jms-client-id", clientID);
+      }
+   }
+
+   public void setReference(HornetQConnectionFactory factory)
+   {
+      this.factoryReference = factory;
    }
 
    // Inner classes --------------------------------------------------------------------------------
@@ -581,7 +619,7 @@ public class HornetQConnection implements Connection, QueueConnection, TopicConn
          connectionRef = new WeakReference<HornetQConnection>(connection);
       }
 
-      public synchronized void connectionFailed(final HornetQException me)
+      public synchronized void connectionFailed(final HornetQException me, boolean failedOver)
       {
          if (me == null)
          {

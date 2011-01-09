@@ -39,6 +39,7 @@ import org.hornetq.spi.core.protocol.ConnectionEntry;
 import org.hornetq.spi.core.protocol.ProtocolManager;
 import org.hornetq.spi.core.protocol.RemotingConnection;
 import org.hornetq.spi.core.remoting.Connection;
+import org.hornetq.spi.core.security.HornetQSecurityManager;
 import org.hornetq.utils.UUIDGenerator;
 
 /**
@@ -142,11 +143,14 @@ class StompProtocolManager implements ProtocolManager
 
    public void handleBuffer(final RemotingConnection connection, final HornetQBuffer buffer)
    {
+      long start = System.nanoTime();
       StompConnection conn = (StompConnection)connection;
       
       conn.setDataReceived();
       
       StompDecoder decoder = conn.getDecoder();
+      
+     // log.info("in handle");
 
       do
       {
@@ -165,7 +169,7 @@ class StompProtocolManager implements ProtocolManager
          
          if (request == null)
          {
-            return;
+            break;
          }
 
          try
@@ -253,6 +257,10 @@ class StompProtocolManager implements ProtocolManager
             server.getStorageManager().clearContext();
          }
       } while (decoder.hasBytes());
+      
+      long end = System.nanoTime();
+      
+     // log.info("handle took " + (end-start));
    }
 
    // Public --------------------------------------------------------
@@ -570,7 +578,13 @@ class StompProtocolManager implements ProtocolManager
       String clientID = (String)headers.get(Stomp.Headers.Connect.CLIENT_ID);
       String requestID = (String)headers.get(Stomp.Headers.Connect.REQUEST_ID);
 
-      server.getSecurityManager().validateUser(login, passcode);
+      HornetQSecurityManager sm = server.getSecurityManager();
+      
+      // The sm will be null case security is not enabled...
+      if (sm != null)
+      {
+         sm.validateUser(login, passcode);
+      }
 
       connection.setLogin(login);
       connection.setPasscode(passcode);

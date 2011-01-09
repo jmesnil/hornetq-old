@@ -24,6 +24,7 @@ import org.hornetq.core.logging.Logger;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.HornetQServers;
 import org.hornetq.core.settings.impl.AddressSettings;
+import org.hornetq.tests.util.ServiceTestBase;
 import org.hornetq.tests.util.UnitTestCase;
 
 /**
@@ -287,6 +288,26 @@ public class LVQTest extends UnitTestCase
       Assert.assertNotNull(m);
       m.acknowledge();
       Assert.assertEquals(m.getBodyBuffer().readString(), "m4");
+   }
+
+   public void testSingleTXRollback() throws Exception
+   {
+      ClientProducer producer = clientSessionTxReceives.createProducer(address);
+      ClientConsumer consumer = clientSessionTxReceives.createConsumer(qName1);
+      SimpleString messageId1 = new SimpleString("SMID1");
+      ClientMessage m1 = createTextMessage("m1", clientSession);
+      m1.putStringProperty(Message.HDR_LAST_VALUE_NAME, messageId1);
+      producer.send(m1);
+      clientSessionTxReceives.start();
+      ClientMessage m = consumer.receive(1000);
+      Assert.assertNotNull(m);
+      m.acknowledge();
+      clientSessionTxReceives.rollback();
+      m = consumer.receive(1000);
+      Assert.assertNotNull(m);
+      m.acknowledge();
+      Assert.assertEquals(m.getBodyBuffer().readString(), "m1");
+      Assert.assertNull(consumer.receiveImmediate());
    }
 
    public void testMultipleMessagesInTxSend() throws Exception
@@ -568,7 +589,7 @@ public class LVQTest extends UnitTestCase
    {
       super.setUp();
 
-      ConfigurationImpl configuration = new ConfigurationImpl();
+      ConfigurationImpl configuration = createBasicConfig();
       configuration.setSecurityEnabled(false);
       TransportConfiguration transportConfig = new TransportConfiguration(UnitTestCase.INVM_ACCEPTOR_FACTORY);
       configuration.getAcceptorConfigurations().add(transportConfig);
@@ -579,10 +600,11 @@ public class LVQTest extends UnitTestCase
       AddressSettings qs = new AddressSettings();
       qs.setLastValueQueue(true);
       server.getAddressSettingsRepository().addMatch(address.toString(), qs);
-      // then we create a client as normal
-      ClientSessionFactory sessionFactory = HornetQClient.createClientSessionFactory(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
-      sessionFactory.setBlockOnAcknowledge(true);
-      sessionFactory.setAckBatchSize(0);
+      // then we create a client as normalServer
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(ServiceTestBase.INVM_CONNECTOR_FACTORY));
+      locator.setBlockOnAcknowledge(true);
+      locator.setAckBatchSize(0);
+      ClientSessionFactory sessionFactory = locator.createSessionFactory();
       clientSession = sessionFactory.createSession(false, true, true);
       clientSessionTxReceives = sessionFactory.createSession(false, true, false);
       clientSessionTxSends = sessionFactory.createSession(false, false, true);

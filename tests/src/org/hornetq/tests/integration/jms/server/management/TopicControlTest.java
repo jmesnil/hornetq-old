@@ -16,6 +16,8 @@ package org.hornetq.tests.integration.jms.server.management;
 import java.util.Map;
 
 import javax.jms.Connection;
+import javax.jms.Message;
+import javax.jms.MessageConsumer;
 import javax.jms.Session;
 import javax.jms.TopicSubscriber;
 
@@ -138,16 +140,22 @@ public class TopicControlTest extends ManagementTestBase
    {
       // 1 non-durable subscriber, 2 durable subscribers
       Connection connection_1 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
-      JMSUtil.createConsumer(connection_1, topic);
+      MessageConsumer cons = JMSUtil.createConsumer(connection_1, topic);
       Connection connection_2 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
-      JMSUtil.createDurableSubscriber(connection_2, topic, clientID, subscriptionName);
+      TopicSubscriber subs1 = JMSUtil.createDurableSubscriber(connection_2, topic, clientID, subscriptionName);
       Connection connection_3 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
-      JMSUtil.createDurableSubscriber(connection_3, topic, clientID, subscriptionName + "2");
+      TopicSubscriber subs2 = JMSUtil.createDurableSubscriber(connection_3, topic, clientID, subscriptionName + "2");
 
       TopicControl topicControl = createManagementControl();
       Assert.assertEquals(3, topicControl.listAllSubscriptions().length);
       Assert.assertEquals(1, topicControl.listNonDurableSubscriptions().length);
       Assert.assertEquals(2, topicControl.listDurableSubscriptions().length);
+      
+      String json = topicControl.listAllSubscriptionsAsJSON();
+      System.out.println("Json: " + json);
+      JSONArray jsonArray = new JSONArray(json);
+      
+      assertEquals(3, jsonArray.length());
 
       connection_1.close();
       connection_2.close();
@@ -406,6 +414,76 @@ public class TopicControlTest extends ManagementTestBase
       {
       }
    }
+   
+   public void testGetMessagesAdded() throws Exception
+   {
+      Connection connection_1 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
+      JMSUtil.createConsumer(connection_1, topic);
+      Connection connection_2 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
+      JMSUtil.createDurableSubscriber(connection_2, topic, clientID, subscriptionName);
+      Connection connection_3 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
+      JMSUtil.createDurableSubscriber(connection_3, topic, clientID, subscriptionName + "2");
+
+      TopicControl topicControl = createManagementControl();
+
+      Assert.assertEquals(0, topicControl.getMessagesAdded());
+
+      JMSUtil.sendMessages(topic, 2);
+
+      Assert.assertEquals(3 * 2, topicControl.getMessagesAdded());
+
+      connection_1.close();
+      connection_2.close();
+      connection_3.close();
+   }
+   
+   public void testGetMessagesDelivering() throws Exception
+   {
+      Connection connection_1 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
+      MessageConsumer cons_1 = JMSUtil.createConsumer(connection_1, topic, Session.CLIENT_ACKNOWLEDGE);
+      Connection connection_2 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
+      MessageConsumer cons_2 = JMSUtil.createDurableSubscriber(connection_2, topic, clientID, subscriptionName, Session.CLIENT_ACKNOWLEDGE);
+      Connection connection_3 = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
+      MessageConsumer cons_3 = JMSUtil.createDurableSubscriber(connection_3, topic, clientID, subscriptionName + "2", Session.CLIENT_ACKNOWLEDGE);
+
+      TopicControl topicControl = createManagementControl();
+
+      assertEquals(0, topicControl.getDeliveringCount());
+
+      JMSUtil.sendMessages(topic, 2);
+
+      assertEquals(0, topicControl.getDeliveringCount());
+      
+      connection_1.start();
+      connection_2.start();
+      connection_3.start();
+
+      Message msg_1 = null;
+      Message msg_2 = null;
+      Message msg_3 = null;
+      for (int i = 0; i < 2; i++)
+      {
+         msg_1 = cons_1.receive(5000);
+         assertNotNull(msg_1);
+         msg_2 = cons_2.receive(5000);
+         assertNotNull(msg_2);
+         msg_3 = cons_3.receive(5000);         
+         assertNotNull(msg_3);
+      }
+
+      assertEquals(3 * 2, topicControl.getDeliveringCount());
+
+      msg_1.acknowledge();
+      assertEquals(2 * 2, topicControl.getDeliveringCount());
+      msg_2.acknowledge();
+      assertEquals(1 * 2, topicControl.getDeliveringCount());
+      msg_3.acknowledge();
+      assertEquals(0, topicControl.getDeliveringCount());
+      
+      connection_1.close();
+      connection_2.close();
+      connection_3.close();
+   }
 
    // Package protected ---------------------------------------------
 
@@ -416,7 +494,7 @@ public class TopicControlTest extends ManagementTestBase
    {
       super.setUp();
 
-      Configuration conf = new ConfigurationImpl();
+      Configuration conf = createBasicConfig();
       conf.setSecurityEnabled(false);
       conf.setJMXManagementEnabled(true);
       conf.getAcceptorConfigurations()

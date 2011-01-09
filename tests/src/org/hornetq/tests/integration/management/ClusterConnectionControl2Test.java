@@ -23,6 +23,7 @@ import javax.management.MBeanServerFactory;
 
 import junit.framework.Assert;
 
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.HornetQClient;
@@ -30,7 +31,6 @@ import org.hornetq.api.core.management.ClusterConnectionControl;
 import org.hornetq.core.config.BroadcastGroupConfiguration;
 import org.hornetq.core.config.ClusterConnectionConfiguration;
 import org.hornetq.core.config.Configuration;
-import org.hornetq.core.config.DiscoveryGroupConfiguration;
 import org.hornetq.core.config.CoreQueueConfiguration;
 import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.remoting.impl.invm.InVMAcceptorFactory;
@@ -132,14 +132,15 @@ public class ClusterConnectionControl2Test extends ManagementTestBase
 
       clusterConnectionConfig_0 = new ClusterConnectionConfiguration(clusterName,
                                                                      queueConfig.getAddress(),
+                                                                     clusterName,
                                                                      1000,
                                                                      false,
                                                                      false,
                                                                      1,
                                                                      1024,
                                                                      discoveryName);
-      List<Pair<String, String>> connectorInfos = new ArrayList<Pair<String, String>>();
-      connectorInfos.add(new Pair<String, String>("netty", null));
+      List<String> connectorInfos = new ArrayList<String>();
+      connectorInfos.add("netty");
       BroadcastGroupConfiguration broadcastGroupConfig = new BroadcastGroupConfiguration(discoveryName,
                                                                                          null,
                                                                                          -1,
@@ -151,9 +152,10 @@ public class ClusterConnectionControl2Test extends ManagementTestBase
                                                                                          null,
                                                                                          groupAddress,
                                                                                          groupPort,
-                                                                                         HornetQClient.DEFAULT_DISCOVERY_REFRESH_TIMEOUT);
+                                                                                         0,
+                                                                                         0);
 
-      Configuration conf_1 = new ConfigurationImpl();
+      Configuration conf_1 = createBasicConfig();
       conf_1.setSecurityEnabled(false);
       conf_1.setJMXManagementEnabled(true);
       conf_1.setClustered(true);
@@ -163,7 +165,7 @@ public class ClusterConnectionControl2Test extends ManagementTestBase
       conf_1.getDiscoveryGroupConfigurations().put(discoveryName, discoveryGroupConfig);
       conf_1.getBroadcastGroupConfigurations().add(broadcastGroupConfig);
 
-      Configuration conf_0 = new ConfigurationImpl();
+      Configuration conf_0 = createBasicConfig();
       conf_0.setSecurityEnabled(false);
       conf_0.setJMXManagementEnabled(true);
       conf_0.setClustered(true);

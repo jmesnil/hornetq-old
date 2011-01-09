@@ -15,10 +15,9 @@ package org.hornetq.jms.server.config;
 
 import java.util.List;
 
-import org.hornetq.api.core.Pair;
 import org.hornetq.api.core.TransportConfiguration;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.core.journal.EncodingSupport;
-import org.hornetq.jms.server.JMSServerManager;
 
 /**
  * A ConnectionFactoryConfiguration
@@ -35,57 +34,21 @@ public interface ConnectionFactoryConfiguration extends EncodingSupport
 
    void setBindings(String[] bindings);
    
-   String getLocalBindAddress();
-   
-   void setLocalBindAddress(String localBindAddress);
-
-   String getDiscoveryAddress();
-
-   void setDiscoveryAddress(String discoveryAddress);
-
-   int getDiscoveryPort();
-
-   void setDiscoveryPort(int discoveryPort);
-
-
-   /**
-    * A Reference to the group configuration.
-    */
    String getDiscoveryGroupName();
    
-   /**
-    * A Reference to the group configuration.
-    */
-   void setDiscoveryGroupName(String groupName);
+   void setDiscoveryGroupName(String discoveryGroupName);
    
+   List<String> getConnectorNames();
+
+   void setConnectorNames(List<String> connectorNames);
    
-   /**
-    * A List of connector names that will be converted into ConnnectorConfigs.
-    * This is useful when using the method {@link JMSServerManager#createConnectionFactory(ConnectionFactoryConfiguration)}
-    * 
-    * @return
-    */
-   List<Pair<String, String>> getConnectorNames();
-
-   /**
-    * A List of connector names that will be converted into ConnnectorConfigs.
-    * This is useful when using the method {@link JMSServerManager#createConnectionFactory(ConnectionFactoryConfiguration)}
-    * 
-    * @return
-    */
-   void setConnectorNames(List<Pair<String, String>> connectors);
-
-   List<Pair<TransportConfiguration, TransportConfiguration>> getConnectorConfigs();
-
-   void setConnectorConfigs(List<Pair<TransportConfiguration, TransportConfiguration>> connectorConfigs);
+   boolean isHA();
+   
+   void setHA(boolean ha);
 
    String getClientID();
 
    void setClientID(String clientID);
-
-   long getDiscoveryRefreshTimeout();
-
-   void setDiscoveryRefreshTimeout(long discoveryRefreshTimeout);
 
    long getClientFailureCheckPeriod();
 
@@ -106,6 +69,10 @@ public interface ConnectionFactoryConfiguration extends EncodingSupport
    int getMinLargeMessageSize();
 
    void setMinLargeMessageSize(int minLargeMessageSize);
+   
+   boolean isCompressLargeMessages();
+   
+   void setCompressLargeMessages(boolean compress);   
 
    int getConsumerWindowSize();
 
@@ -159,10 +126,6 @@ public interface ConnectionFactoryConfiguration extends EncodingSupport
 
    void setDupsOKBatchSize(int dupsOKBatchSize);
 
-   long getInitialWaitTimeout();
-
-   void setInitialWaitTimeout(long initialWaitTimeout);
-
    boolean isUseGlobalPools();
 
    void setUseGlobalPools(boolean useGlobalPools);
@@ -191,10 +154,6 @@ public interface ConnectionFactoryConfiguration extends EncodingSupport
 
    void setReconnectAttempts(int reconnectAttempts);
 
-   boolean isFailoverOnServerShutdown();
-
-   void setFailoverOnServerShutdown(boolean failoverOnServerShutdown);
-   
    boolean isFailoverOnInitialConnection();
 
    void setFailoverOnInitialConnection(boolean failover);
@@ -202,4 +161,8 @@ public interface ConnectionFactoryConfiguration extends EncodingSupport
    String getGroupID();
 
    void setGroupID(String groupID);
+
+   void setFactoryType(JMSFactoryType factType);
+   
+   JMSFactoryType getFactoryType();
 }

@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.Assert;
@@ -27,6 +28,7 @@ import org.hornetq.api.core.client.ClientProducer;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.MessageHandler;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.core.client.impl.ClientProducerCreditManagerImpl;
 import org.hornetq.core.client.impl.ClientProducerCredits;
 import org.hornetq.core.client.impl.ClientProducerInternal;
@@ -51,9 +53,26 @@ public class ProducerFlowControlTest extends ServiceTestBase
 {
    private static final Logger log = Logger.getLogger(ProducerFlowControlTest.class);
 
+   private ServerLocator locator;
+
    protected boolean isNetty()
    {
       return false;
+   }
+
+   @Override
+   protected void setUp() throws Exception
+   {
+      super.setUp();
+      locator = createFactory(isNetty());
+   }
+
+   @Override
+   protected void tearDown() throws Exception
+   {
+      locator.close();
+
+      super.tearDown();
    }
 
    // TODO need to test crashing a producer with unused credits returns them to the pool
@@ -87,7 +106,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
    {
       testFlowControl(1000, 500, 10 * 1024, 1024, 1024, 0, 1, 1, 0, false);
    }
-   
+
    public void testFlowControlSingleConsumerSlowConsumer() throws Exception
    {
       testFlowControl(100, 500, 1024, 512, 512, 512, 1, 1, 10, false);
@@ -199,17 +218,16 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
-
-      sf.setProducerWindowSize(producerWindowSize);
-      sf.setConsumerWindowSize(consumerWindowSize);
-      sf.setAckBatchSize(ackBatchSize);
+      locator.setProducerWindowSize(producerWindowSize);
+      locator.setConsumerWindowSize(consumerWindowSize);
+      locator.setAckBatchSize(ackBatchSize);
 
       if (minLargeMessageSize != -1)
       {
-         sf.setMinLargeMessageSize(minLargeMessageSize);
+         locator.setMinLargeMessageSize(minLargeMessageSize);
       }
 
+      ClientSessionFactory sf = locator.createSessionFactory();
       ClientSession session = sf.createSession(false, true, true, true);
 
       session.start();
@@ -314,7 +332,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       for (int i = 0; i < numConsumers; i++)
       {
-         handlers[i].latch.await();
+         assertTrue(handlers[i].latch.await(5, TimeUnit.MINUTES));
 
          Assert.assertNull(handlers[i].exception);
       }
@@ -326,7 +344,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
       ProducerFlowControlTest.log.info("rate is " + rate + " msgs / sec");
 
       session.close();
-      
+
       sf.close();
 
       server.stop();
@@ -347,12 +365,11 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      locator.setProducerWindowSize(1024);
+      locator.setConsumerWindowSize(1024);
+      locator.setAckBatchSize(1024);
 
-      sf.setProducerWindowSize(1024);
-      sf.setConsumerWindowSize(1024);
-      sf.setAckBatchSize(1024);
-
+      ClientSessionFactory sf = locator.createSessionFactory();
       final ClientSession session = sf.createSession(false, true, true, true);
 
       final SimpleString queueName = new SimpleString("testqueue");
@@ -414,11 +431,11 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      locator.setProducerWindowSize(1024);
+      locator.setConsumerWindowSize(1024);
+      locator.setAckBatchSize(1024);
 
-      sf.setProducerWindowSize(1024);
-      sf.setConsumerWindowSize(1024);
-      sf.setAckBatchSize(1024);
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -449,7 +466,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -516,7 +533,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -552,7 +569,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -590,7 +607,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -626,7 +643,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -664,7 +681,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -728,7 +745,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -755,7 +772,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 
@@ -806,7 +823,7 @@ public class ProducerFlowControlTest extends ServiceTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(isNetty());
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       final ClientSession session = sf.createSession(false, true, true, true);
 

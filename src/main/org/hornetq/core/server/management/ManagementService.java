@@ -18,6 +18,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import javax.management.ObjectName;
 
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.management.ObjectNameBuilder;
@@ -26,7 +27,6 @@ import org.hornetq.core.config.BridgeConfiguration;
 import org.hornetq.core.config.BroadcastGroupConfiguration;
 import org.hornetq.core.config.ClusterConnectionConfiguration;
 import org.hornetq.core.config.Configuration;
-import org.hornetq.core.config.DiscoveryGroupConfiguration;
 import org.hornetq.core.config.DivertConfiguration;
 import org.hornetq.core.management.impl.HornetQServerControlImpl;
 import org.hornetq.core.messagecounter.MessageCounterManager;
@@ -114,9 +114,9 @@ public interface ManagementService extends NotificationService, HornetQComponent
 
    void unregisterBroadcastGroup(String name) throws Exception;
 
-   void registerDiscoveryGroup(DiscoveryGroup discoveryGroup, DiscoveryGroupConfiguration configuration) throws Exception;
+ //  void registerDiscoveryGroup(DiscoveryGroup discoveryGroup, DiscoveryGroupConfiguration configuration) throws Exception;
 
-   void unregisterDiscoveryGroup(String name) throws Exception;
+   //void unregisterDiscoveryGroup(String name) throws Exception;
 
    void registerBridge(Bridge bridge, BridgeConfiguration configuration) throws Exception;
 

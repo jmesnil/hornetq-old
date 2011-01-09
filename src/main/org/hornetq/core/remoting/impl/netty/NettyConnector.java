@@ -66,6 +66,7 @@ import org.jboss.netty.handler.codec.http.Cookie;
 import org.jboss.netty.handler.codec.http.CookieDecoder;
 import org.jboss.netty.handler.codec.http.CookieEncoder;
 import org.jboss.netty.handler.codec.http.DefaultHttpRequest;
+import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpRequest;
@@ -354,6 +355,8 @@ public class NettyConnector implements Connector
                handlers.add(new HttpRequestEncoder());
 
                handlers.add(new HttpResponseDecoder());
+               
+               handlers.add(new HttpChunkAggregator(Integer.MAX_VALUE));
 
                handlers.add(new HttpHandler());
             }
@@ -517,7 +520,7 @@ public class NettyConnector implements Connector
 
       private HttpIdleTimer task;
 
-      private final String url = "http://" + host + ":" + port + servletPath;
+      private final String url;
 
       private final Future handShakeFuture = new Future();
 
@@ -530,6 +533,11 @@ public class NettyConnector implements Connector
       private String cookie;
 
       private final CookieEncoder cookieEncoder = new CookieEncoder(false);
+      
+      public HttpHandler() throws Exception
+      {
+         url = new URI("http", null, host, port, servletPath, null, null).toString();
+      }
 
       @Override
       public void channelConnected(final ChannelHandlerContext ctx, final ChannelStateEvent e) throws Exception
@@ -693,6 +701,12 @@ public class NettyConnector implements Connector
             }
          });
       }
+
+      public void connectionReadyForWrites(Object connectionID, boolean ready)
+      {
+      }
+      
+      
    }
    
    private class BatchFlusher implements Runnable

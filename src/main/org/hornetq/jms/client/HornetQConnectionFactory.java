@@ -14,29 +14,24 @@
 package org.hornetq.jms.client;
 
 import java.io.Serializable;
-import java.util.List;
 
 import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
 import javax.jms.JMSException;
 import javax.jms.QueueConnection;
-import javax.jms.QueueConnectionFactory;
 import javax.jms.TopicConnection;
-import javax.jms.TopicConnectionFactory;
 import javax.jms.XAConnection;
-import javax.jms.XAConnectionFactory;
 import javax.jms.XAQueueConnection;
-import javax.jms.XAQueueConnectionFactory;
 import javax.jms.XATopicConnection;
-import javax.jms.XATopicConnectionFactory;
 import javax.naming.NamingException;
 import javax.naming.Reference;
 import javax.naming.Referenceable;
 
-import org.hornetq.api.core.Pair;
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.jms.referenceable.ConnectionFactoryObjectFactory;
 import org.hornetq.jms.referenceable.SerializableObjectRefAddr;
@@ -48,8 +43,7 @@ import org.hornetq.jms.referenceable.SerializableObjectRefAddr;
  * @author <a href="mailto:tim.fox@jboss.com">Tim Fox</a>
  * @version <tt>$Revision$</tt> $Id$
  */
-public class HornetQConnectionFactory implements ConnectionFactory, QueueConnectionFactory, TopicConnectionFactory,
-         XAConnectionFactory, XAQueueConnectionFactory, XATopicConnectionFactory, Serializable, Referenceable
+public class HornetQConnectionFactory implements Serializable, Referenceable
 {
    // Constants ------------------------------------------------------------------------------------
 
@@ -61,7 +55,7 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    // Attributes -----------------------------------------------------------------------------------
 
-   private final ClientSessionFactory sessionFactory;
+   private final ServerLocator serverLocator;
 
    private String clientID;
 
@@ -75,33 +69,42 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    public HornetQConnectionFactory()
    {
-      sessionFactory = HornetQClient.createClientSessionFactory();
+      serverLocator = null;
+   }
+   
+   public HornetQConnectionFactory(final ServerLocator serverLocator)
+   {
+      this.serverLocator = serverLocator;
+      
+      serverLocator.disableFinalizeCheck();
    }
 
-   public HornetQConnectionFactory(final ClientSessionFactory sessionFactory)
+   public HornetQConnectionFactory(final boolean ha, final DiscoveryGroupConfiguration groupConfiguration)
    {
-      this.sessionFactory = sessionFactory;
+      if (ha)
+      {
+         serverLocator = HornetQClient.createServerLocatorWithHA(groupConfiguration);
+      }
+      else
+      {
+         serverLocator = HornetQClient.createServerLocatorWithoutHA(groupConfiguration);
+      }
+      
+      serverLocator.disableFinalizeCheck();
    }
 
-   public HornetQConnectionFactory(final String discoveryAddress, final int discoveryPort)
+   public HornetQConnectionFactory(final boolean ha, final TransportConfiguration... initialConnectors)
    {
-      sessionFactory = HornetQClient.createClientSessionFactory(discoveryAddress, discoveryPort);
-   }
-
-   public HornetQConnectionFactory(final List<Pair<TransportConfiguration, TransportConfiguration>> staticConnectors)
-   {
-      sessionFactory = HornetQClient.createClientSessionFactory(staticConnectors);
-   }
-
-   public HornetQConnectionFactory(final TransportConfiguration connectorConfig,
-                                   final TransportConfiguration backupConnectorConfig)
-   {
-      sessionFactory = HornetQClient.createClientSessionFactory(connectorConfig, backupConnectorConfig);
-   }
-
-   public HornetQConnectionFactory(final TransportConfiguration connectorConfig)
-   {
-      this(connectorConfig, null);
+      if (ha)
+      {
+         serverLocator = HornetQClient.createServerLocatorWithHA(initialConnectors);
+      }
+      else
+      {
+         serverLocator = HornetQClient.createServerLocatorWithoutHA(initialConnectors);
+      }
+      
+      serverLocator.disableFinalizeCheck();
    }
 
    // ConnectionFactory implementation -------------------------------------------------------------
@@ -125,7 +128,7 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    public QueueConnection createQueueConnection(final String username, final String password) throws JMSException
    {
-      return createConnectionInternal(username, password, false, HornetQConnection.TYPE_QUEUE_CONNECTION);
+      return (QueueConnection)createConnectionInternal(username, password, false, HornetQConnection.TYPE_QUEUE_CONNECTION);
    }
 
    // TopicConnectionFactory implementation --------------------------------------------------------
@@ -137,7 +140,7 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    public TopicConnection createTopicConnection(final String username, final String password) throws JMSException
    {
-      return createConnectionInternal(username, password, false, HornetQConnection.TYPE_TOPIC_CONNECTION);
+      return (TopicConnection)createConnectionInternal(username, password, false, HornetQConnection.TYPE_TOPIC_CONNECTION);
    }
 
    // XAConnectionFactory implementation -----------------------------------------------------------
@@ -149,7 +152,7 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    public XAConnection createXAConnection(final String username, final String password) throws JMSException
    {
-      return createConnectionInternal(username, password, true, HornetQConnection.TYPE_GENERIC_CONNECTION);
+      return (XAConnection)createConnectionInternal(username, password, true, HornetQConnection.TYPE_GENERIC_CONNECTION);
    }
 
    // XAQueueConnectionFactory implementation ------------------------------------------------------
@@ -161,7 +164,7 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    public XAQueueConnection createXAQueueConnection(final String username, final String password) throws JMSException
    {
-      return createConnectionInternal(username, password, true, HornetQConnection.TYPE_QUEUE_CONNECTION);
+      return (XAQueueConnection)createConnectionInternal(username, password, true, HornetQConnection.TYPE_QUEUE_CONNECTION);
    }
 
    // XATopicConnectionFactory implementation ------------------------------------------------------
@@ -173,7 +176,7 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    public XATopicConnection createXATopicConnection(final String username, final String password) throws JMSException
    {
-      return createConnectionInternal(username, password, true, HornetQConnection.TYPE_TOPIC_CONNECTION);
+      return (XATopicConnection)createConnectionInternal(username, password, true, HornetQConnection.TYPE_TOPIC_CONNECTION);
    }
 
    // Referenceable implementation -----------------------------------------------------------------
@@ -188,81 +191,30 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    // Public ---------------------------------------------------------------------------------------
 
+   public boolean isHA()
+   {
+      return serverLocator.isHA();
+   }
+
    public synchronized String getConnectionLoadBalancingPolicyClassName()
    {
-      return sessionFactory.getConnectionLoadBalancingPolicyClassName();
+      return serverLocator.getConnectionLoadBalancingPolicyClassName();
    }
 
    public synchronized void setConnectionLoadBalancingPolicyClassName(final String connectionLoadBalancingPolicyClassName)
    {
       checkWrite();
-      sessionFactory.setConnectionLoadBalancingPolicyClassName(connectionLoadBalancingPolicyClassName);
+      serverLocator.setConnectionLoadBalancingPolicyClassName(connectionLoadBalancingPolicyClassName);
    }
 
-   public synchronized List<Pair<TransportConfiguration, TransportConfiguration>> getStaticConnectors()
+   public synchronized TransportConfiguration[] getStaticConnectors()
    {
-      return sessionFactory.getStaticConnectors();
+      return serverLocator.getStaticTransportConfigurations();
    }
 
-   public synchronized void setStaticConnectors(final List<Pair<TransportConfiguration, TransportConfiguration>> staticConnectors)
+   public synchronized DiscoveryGroupConfiguration getDiscoveryGroupConfiguration()
    {
-      checkWrite();
-      sessionFactory.setStaticConnectors(staticConnectors);
-   }
-   
-   public synchronized String getLocalBindAddress()
-   {
-      return sessionFactory.getLocalBindAddress();
-   }
-
-   public synchronized void setLocalBindAddress(final String localBindAddress)
-   {
-      checkWrite();
-      sessionFactory.setLocalBindAddress(localBindAddress);
-   }
-
-   public synchronized String getDiscoveryAddress()
-   {
-      return sessionFactory.getDiscoveryAddress();
-   }
-
-   public synchronized void setDiscoveryAddress(final String discoveryAddress)
-   {
-      checkWrite();
-      sessionFactory.setDiscoveryAddress(discoveryAddress);
-   }
-
-   public synchronized int getDiscoveryPort()
-   {
-      return sessionFactory.getDiscoveryPort();
-   }
-
-   public synchronized void setDiscoveryPort(final int discoveryPort)
-   {
-      checkWrite();
-      sessionFactory.setDiscoveryPort(discoveryPort);
-   }
-
-   public synchronized long getDiscoveryRefreshTimeout()
-   {
-      return sessionFactory.getDiscoveryRefreshTimeout();
-   }
-
-   public synchronized void setDiscoveryRefreshTimeout(final long discoveryRefreshTimeout)
-   {
-      checkWrite();
-      sessionFactory.setDiscoveryRefreshTimeout(discoveryRefreshTimeout);
-   }
-
-   public synchronized long getDiscoveryInitialWaitTimeout()
-   {
-      return sessionFactory.getDiscoveryInitialWaitTimeout();
-   }
-
-   public synchronized void setDiscoveryInitialWaitTimeout(final long discoveryInitialWaitTimeout)
-   {
-      checkWrite();
-      sessionFactory.setDiscoveryInitialWaitTimeout(discoveryInitialWaitTimeout);
+      return serverLocator.getDiscoveryGroupConfiguration();
    }
 
    public synchronized String getClientID()
@@ -300,90 +252,90 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
 
    public synchronized long getClientFailureCheckPeriod()
    {
-      return sessionFactory.getClientFailureCheckPeriod();
+      return serverLocator.getClientFailureCheckPeriod();
    }
 
    public synchronized void setClientFailureCheckPeriod(final long clientFailureCheckPeriod)
    {
       checkWrite();
-      sessionFactory.setClientFailureCheckPeriod(clientFailureCheckPeriod);
+      serverLocator.setClientFailureCheckPeriod(clientFailureCheckPeriod);
    }
 
    public synchronized long getConnectionTTL()
    {
-      return sessionFactory.getConnectionTTL();
+      return serverLocator.getConnectionTTL();
    }
 
    public synchronized void setConnectionTTL(final long connectionTTL)
    {
       checkWrite();
-      sessionFactory.setConnectionTTL(connectionTTL);
+      serverLocator.setConnectionTTL(connectionTTL);
    }
 
    public synchronized long getCallTimeout()
    {
-      return sessionFactory.getCallTimeout();
+      return serverLocator.getCallTimeout();
    }
 
    public synchronized void setCallTimeout(final long callTimeout)
    {
       checkWrite();
-      sessionFactory.setCallTimeout(callTimeout);
+      serverLocator.setCallTimeout(callTimeout);
    }
 
    public synchronized int getConsumerWindowSize()
    {
-      return sessionFactory.getConsumerWindowSize();
+      return serverLocator.getConsumerWindowSize();
    }
 
    public synchronized void setConsumerWindowSize(final int consumerWindowSize)
    {
       checkWrite();
-      sessionFactory.setConsumerWindowSize(consumerWindowSize);
+      serverLocator.setConsumerWindowSize(consumerWindowSize);
    }
 
    public synchronized int getConsumerMaxRate()
    {
-      return sessionFactory.getConsumerMaxRate();
+      return serverLocator.getConsumerMaxRate();
    }
 
    public synchronized void setConsumerMaxRate(final int consumerMaxRate)
    {
       checkWrite();
-      sessionFactory.setConsumerMaxRate(consumerMaxRate);
+      serverLocator.setConsumerMaxRate(consumerMaxRate);
    }
 
    public synchronized int getConfirmationWindowSize()
    {
-      return sessionFactory.getConfirmationWindowSize();
+      return serverLocator.getConfirmationWindowSize();
    }
 
    public synchronized void setConfirmationWindowSize(final int confirmationWindowSize)
    {
       checkWrite();
-      sessionFactory.setConfirmationWindowSize(confirmationWindowSize);
+      serverLocator.setConfirmationWindowSize(confirmationWindowSize);
    }
 
    public synchronized int getProducerMaxRate()
    {
-      return sessionFactory.getProducerMaxRate();
+      return serverLocator.getProducerMaxRate();
    }
 
    public synchronized void setProducerMaxRate(final int producerMaxRate)
    {
       checkWrite();
-      sessionFactory.setProducerMaxRate(producerMaxRate);
+      serverLocator.setProducerMaxRate(producerMaxRate);
    }
 
    public synchronized int getProducerWindowSize()
    {
-      return sessionFactory.getProducerWindowSize();
+      return serverLocator.getProducerWindowSize();
    }
 
    public synchronized void setProducerWindowSize(final int producerWindowSize)
    {
       checkWrite();
-      sessionFactory.setProducerWindowSize(producerWindowSize);
+      serverLocator.setProducerWindowSize(producerWindowSize);
    }
 
    /**
@@ -392,210 +344,245 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
    public synchronized void setCacheLargeMessagesClient(final boolean cacheLargeMessagesClient)
    {
       checkWrite();
-      sessionFactory.setCacheLargeMessagesClient(cacheLargeMessagesClient);
+      serverLocator.setCacheLargeMessagesClient(cacheLargeMessagesClient);
    }
 
    public synchronized boolean isCacheLargeMessagesClient()
    {
-      return sessionFactory.isCacheLargeMessagesClient();
+      return serverLocator.isCacheLargeMessagesClient();
    }
 
    public synchronized int getMinLargeMessageSize()
    {
-      return sessionFactory.getMinLargeMessageSize();
+      return serverLocator.getMinLargeMessageSize();
    }
 
    public synchronized void setMinLargeMessageSize(final int minLargeMessageSize)
    {
       checkWrite();
-      sessionFactory.setMinLargeMessageSize(minLargeMessageSize);
+      serverLocator.setMinLargeMessageSize(minLargeMessageSize);
    }
 
    public synchronized boolean isBlockOnAcknowledge()
    {
-      return sessionFactory.isBlockOnAcknowledge();
+      return serverLocator.isBlockOnAcknowledge();
    }
 
    public synchronized void setBlockOnAcknowledge(final boolean blockOnAcknowledge)
    {
       checkWrite();
-      sessionFactory.setBlockOnAcknowledge(blockOnAcknowledge);
+      serverLocator.setBlockOnAcknowledge(blockOnAcknowledge);
    }
 
    public synchronized boolean isBlockOnNonDurableSend()
    {
-      return sessionFactory.isBlockOnNonDurableSend();
+      return serverLocator.isBlockOnNonDurableSend();
    }
 
    public synchronized void setBlockOnNonDurableSend(final boolean blockOnNonDurableSend)
    {
       checkWrite();
-      sessionFactory.setBlockOnNonDurableSend(blockOnNonDurableSend);
+      serverLocator.setBlockOnNonDurableSend(blockOnNonDurableSend);
    }
 
    public synchronized boolean isBlockOnDurableSend()
    {
-      return sessionFactory.isBlockOnDurableSend();
+      return serverLocator.isBlockOnDurableSend();
    }
 
    public synchronized void setBlockOnDurableSend(final boolean blockOnDurableSend)
    {
       checkWrite();
-      sessionFactory.setBlockOnDurableSend(blockOnDurableSend);
+      serverLocator.setBlockOnDurableSend(blockOnDurableSend);
    }
 
    public synchronized boolean isAutoGroup()
    {
-      return sessionFactory.isAutoGroup();
+      return serverLocator.isAutoGroup();
    }
 
    public synchronized void setAutoGroup(final boolean autoGroup)
    {
       checkWrite();
-      sessionFactory.setAutoGroup(autoGroup);
+      serverLocator.setAutoGroup(autoGroup);
    }
 
    public synchronized boolean isPreAcknowledge()
    {
-      return sessionFactory.isPreAcknowledge();
+      return serverLocator.isPreAcknowledge();
    }
 
    public synchronized void setPreAcknowledge(final boolean preAcknowledge)
    {
       checkWrite();
-      sessionFactory.setPreAcknowledge(preAcknowledge);
+      serverLocator.setPreAcknowledge(preAcknowledge);
    }
 
    public synchronized long getRetryInterval()
    {
-      return sessionFactory.getRetryInterval();
+      return serverLocator.getRetryInterval();
    }
 
    public synchronized void setRetryInterval(final long retryInterval)
    {
       checkWrite();
-      sessionFactory.setRetryInterval(retryInterval);
+      serverLocator.setRetryInterval(retryInterval);
    }
 
    public synchronized long getMaxRetryInterval()
    {
-      return sessionFactory.getMaxRetryInterval();
+      return serverLocator.getMaxRetryInterval();
    }
 
    public synchronized void setMaxRetryInterval(final long retryInterval)
    {
       checkWrite();
-      sessionFactory.setMaxRetryInterval(retryInterval);
+      serverLocator.setMaxRetryInterval(retryInterval);
    }
 
    public synchronized double getRetryIntervalMultiplier()
    {
-      return sessionFactory.getRetryIntervalMultiplier();
+      return serverLocator.getRetryIntervalMultiplier();
    }
 
    public synchronized void setRetryIntervalMultiplier(final double retryIntervalMultiplier)
    {
       checkWrite();
-      sessionFactory.setRetryIntervalMultiplier(retryIntervalMultiplier);
+      serverLocator.setRetryIntervalMultiplier(retryIntervalMultiplier);
    }
 
    public synchronized int getReconnectAttempts()
    {
-      return sessionFactory.getReconnectAttempts();
+      return serverLocator.getReconnectAttempts();
    }
 
    public synchronized void setReconnectAttempts(final int reconnectAttempts)
    {
       checkWrite();
-      sessionFactory.setReconnectAttempts(reconnectAttempts);
+      serverLocator.setReconnectAttempts(reconnectAttempts);
+   }
+
+   public synchronized void setInitialConnectAttempts(final int reconnectAttempts)
+   {
+      checkWrite();
+      serverLocator.setInitialConnectAttempts(reconnectAttempts);
+   }
+
+   public synchronized int getInitialConnectAttempts()
+   {
+      checkWrite();
+      return serverLocator.getInitialConnectAttempts();
    }
    
    public synchronized boolean isFailoverOnInitialConnection()
    {
-      return sessionFactory.isFailoverOnInitialConnection();
+      return serverLocator.isFailoverOnInitialConnection();
    }
 
    public synchronized void setFailoverOnInitialConnection(final boolean failover)
    {
       checkWrite();
-      sessionFactory.setFailoverOnInitialConnection(failover);
-   }
-
-   public synchronized boolean isFailoverOnServerShutdown()
-   {
-      return sessionFactory.isFailoverOnServerShutdown();
-   }
-
-   public synchronized void setFailoverOnServerShutdown(final boolean failoverOnServerShutdown)
-   {
-      checkWrite();
-      sessionFactory.setFailoverOnServerShutdown(failoverOnServerShutdown);
+      serverLocator.setFailoverOnInitialConnection(failover);
    }
 
    public synchronized boolean isUseGlobalPools()
    {
-      return sessionFactory.isUseGlobalPools();
+      return serverLocator.isUseGlobalPools();
    }
 
    public synchronized void setUseGlobalPools(final boolean useGlobalPools)
    {
       checkWrite();
-      sessionFactory.setUseGlobalPools(useGlobalPools);
+      serverLocator.setUseGlobalPools(useGlobalPools);
    }
 
    public synchronized int getScheduledThreadPoolMaxSize()
    {
-      return sessionFactory.getScheduledThreadPoolMaxSize();
+      return serverLocator.getScheduledThreadPoolMaxSize();
    }
 
    public synchronized void setScheduledThreadPoolMaxSize(final int scheduledThreadPoolMaxSize)
    {
       checkWrite();
-      sessionFactory.setScheduledThreadPoolMaxSize(scheduledThreadPoolMaxSize);
+      serverLocator.setScheduledThreadPoolMaxSize(scheduledThreadPoolMaxSize);
    }
 
    public synchronized int getThreadPoolMaxSize()
    {
-      return sessionFactory.getThreadPoolMaxSize();
+      return serverLocator.getThreadPoolMaxSize();
    }
 
    public synchronized void setThreadPoolMaxSize(final int threadPoolMaxSize)
    {
       checkWrite();
-      sessionFactory.setThreadPoolMaxSize(threadPoolMaxSize);
+      serverLocator.setThreadPoolMaxSize(threadPoolMaxSize);
    }
 
    public synchronized int getInitialMessagePacketSize()
    {
-      return sessionFactory.getInitialMessagePacketSize();
+      return serverLocator.getInitialMessagePacketSize();
    }
 
    public synchronized void setInitialMessagePacketSize(final int size)
    {
       checkWrite();
-      sessionFactory.setInitialMessagePacketSize(size);
-   }
-
-   public ClientSessionFactory getCoreFactory()
-   {
-      return sessionFactory;
+      serverLocator.setInitialMessagePacketSize(size);
    }
 
    public void setGroupID(final String groupID)
    {
-      sessionFactory.setGroupID(groupID);
+      serverLocator.setGroupID(groupID);
    }
 
    public String getGroupID()
    {
-      return sessionFactory.getGroupID();
+      return serverLocator.getGroupID();
+   }
+   
+   public boolean isCompressLargeMessage()
+   {
+      return serverLocator.isCompressLargeMessage();
+   }
+   
+   public void setCompressLargeMessage(boolean compress)
+   {
+      serverLocator.setCompressLargeMessage(compress);
    }
    
    public void close()
    {
-      sessionFactory.close();
+      serverLocator.close();
+   }
+   
+   public ServerLocator getServerLocator()
+   {
+      return serverLocator;
    }
 
+   public int getFactoryType()
+   {
+      return JMSFactoryType.CF.intValue();
+   }
+   /**
+    * 
+    * @deprecated use {@link ServerLocator#createSessionFactory()}
+    * @return
+    */
+   @Deprecated
+   public ClientSessionFactory getCoreFactory() throws JMSException
+   {
+      try
+      {
+         return serverLocator.createSessionFactory();
+      }
+      catch (Exception e)
+      {
+         JMSException ex = new JMSException (e.getMessage());
+         ex.initCause(e);
+         throw ex;
+      }
+   }
+   
    // Package protected ----------------------------------------------------------------------------
 
    // Protected ------------------------------------------------------------------------------------
@@ -607,18 +594,90 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
    {
       readOnly = true;
 
-      // Note that each JMS connection gets it's own copy of the connection factory
-      // This means there is one underlying remoting connection per jms connection (if not load balanced)
-      ClientSessionFactory factory = sessionFactory.copy();
+      ClientSessionFactory factory;
+      
+      try
+      {
+         factory = serverLocator.createSessionFactory();
+      }
+      catch (Exception e)
+      {
+         JMSException jmse = new JMSException("Failed to create session factory");
+         
+         jmse.setLinkedException(e);
+         
+         throw jmse;
+      }
 
-      HornetQConnection connection = new HornetQConnection(username,
-                                                           password,
-                                                           type,
-                                                           clientID,
-                                                           dupsOKBatchSize,
-                                                           transactionBatchSize,
-                                                           factory);
-
+      HornetQConnection connection = null;
+      
+      if (isXA)
+      {
+         if (type == HornetQConnection.TYPE_GENERIC_CONNECTION)
+         {
+            connection = new HornetQXAConnection(username,
+                                                password,
+                                                type,
+                                                clientID,
+                                                dupsOKBatchSize,
+                                                transactionBatchSize,
+                                                factory);
+         }
+         else if (type == HornetQConnection.TYPE_QUEUE_CONNECTION)
+         {
+            connection = new HornetQXAQueueConnection(username,
+                                                      password,
+                                                      type,
+                                                      clientID,
+                                                      dupsOKBatchSize,
+                                                      transactionBatchSize,
+                                                      factory);
+         }
+         else if (type == HornetQConnection.TYPE_TOPIC_CONNECTION)
+         {
+            connection = new HornetQXATopicConnection(username,
+                                                      password,
+                                                      type,
+                                                      clientID,
+                                                      dupsOKBatchSize,
+                                                      transactionBatchSize,
+                                                      factory);
+         }
+      }
+      else
+      {
+         if (type == HornetQConnection.TYPE_GENERIC_CONNECTION)
+         {
+            connection = new HornetQConnection(username,
+                                               password,
+                                               type,
+                                               clientID,
+                                               dupsOKBatchSize,
+                                               transactionBatchSize,
+                                               factory);
+         }
+         else if (type == HornetQConnection.TYPE_QUEUE_CONNECTION)
+         {
+            connection = new HornetQQueueConnection(username,
+                                                    password,
+                                                    type,
+                                                    clientID,
+                                                    dupsOKBatchSize,
+                                                    transactionBatchSize,
+                                                    factory);
+         }
+         else if (type == HornetQConnection.TYPE_TOPIC_CONNECTION)
+         {
+            connection = new HornetQTopicConnection(username,
+                                                    password,
+                                                    type,
+                                                    clientID,
+                                                    dupsOKBatchSize,
+                                                    transactionBatchSize,
+                                                    factory);
+         }         
+      }
+      connection.setReference(this);
       try
       {
          connection.authorize();
@@ -648,6 +707,19 @@ public class HornetQConnectionFactory implements ConnectionFactory, QueueConnect
       }
    }
 
+   public void finalize() throws Throwable
+   {
+      try
+      {
+         serverLocator.close();
+      }
+      catch (Exception e)
+      {
+         e.printStackTrace();
+         //not much we can do here
+      }
+      super.finalize();
+   }
    // Inner classes --------------------------------------------------------------------------------
 
 }

@@ -74,7 +74,7 @@ public interface ClientSession extends XAResource
       /**
        * Returns the number of messages in the queue.
        */
-      int getMessageCount();
+      long getMessageCount();
 
       /**
        * Returns the queue's filter string (or <code>null</code> if the queue has no filter).
@@ -562,4 +562,9 @@ public interface ClientSession extends XAResource
     */
    void setSendAcknowledgementHandler(SendAcknowledgementHandler handler);
 
+   /**
+    * Attach any metadata to the session.
+    * @throws HornetQException 
+    */
+   void addMetaData(String key, String data) throws HornetQException;
 }

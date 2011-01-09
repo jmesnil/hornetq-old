@@ -13,7 +13,6 @@
 
 package org.hornetq.tests.integration.jms.server.management;
 
-import java.util.List;
 import java.util.Map;
 
 import javax.jms.QueueConnection;
@@ -23,10 +22,10 @@ import javax.jms.Session;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.management.ResourceNames;
 import org.hornetq.api.jms.HornetQJMSClient;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.api.jms.management.JMSQueueControl;
 import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
 import org.hornetq.jms.client.HornetQConnectionFactory;
-import org.hornetq.jms.client.HornetQDestination;
 import org.hornetq.jms.client.HornetQQueue;
 
 /**
@@ -58,7 +57,7 @@ public class JMSQueueControlUsingJMSTest extends JMSQueueControlTest
    {
       super.setUp();
 
-      HornetQConnectionFactory cf = (HornetQConnectionFactory)HornetQJMSClient.createConnectionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      HornetQConnectionFactory cf = (HornetQConnectionFactory)HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration(InVMConnectorFactory.class.getName()));
       connection = cf.createQueueConnection();
       session = connection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
       connection.start();
@@ -97,9 +96,9 @@ public class JMSQueueControlUsingJMSTest extends JMSQueueControlTest
             return (Integer)proxy.invokeOperation("changeMessagesPriority", filter, newPriority);
          }
 
-         public int countMessages(final String filter) throws Exception
+         public long countMessages(final String filter) throws Exception
          {
-            return (Integer)proxy.invokeOperation("countMessages", filter);
+            return ((Number)proxy.invokeOperation("countMessages", filter)).intValue();
          }
 
          public boolean expireMessage(final String messageID) throws Exception
@@ -132,9 +131,9 @@ public class JMSQueueControlUsingJMSTest extends JMSQueueControlTest
             return (String)proxy.retrieveAttributeValue("expiryAddress");
          }
 
-         public int getMessageCount()
+         public long getMessageCount()
          {
-            return (Integer)proxy.retrieveAttributeValue("messageCount");
+            return ((Number)proxy.retrieveAttributeValue("messageCount")).longValue();
          }
 
          public long getMessagesAdded()
@@ -283,6 +282,11 @@ public class JMSQueueControlUsingJMSTest extends JMSQueueControlTest
          {
             // TODO: Add a test for this
             return null;
+         }
+
+         public String listConsumersAsJSON() throws Exception
+         {
+            return (String)proxy.invokeOperation("listConsumersAsJSON");
          }
       };
    }

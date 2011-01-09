@@ -24,7 +24,6 @@ import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.PropertyConversionException;
 import org.hornetq.api.core.SimpleString;
 import org.hornetq.core.buffers.impl.ResetLimitWrappedHornetQBuffer;
-import org.hornetq.core.client.impl.LargeMessageBufferInternal;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.message.BodyEncoder;
 import org.hornetq.core.protocol.core.impl.PacketImpl;
@@ -245,18 +244,24 @@ public abstract class MessageImpl implements MessageInternal
       properties.decode(buffer);
    }
    
+   public void copyHeadersAndProperties(final MessageInternal msg)
+   {
+      messageID = msg.getMessageID();
+      address = msg.getAddress();
+      userID = msg.getUserID();
+      type = msg.getType();
+      durable = msg.isDurable();
+      expiration = msg.getExpiration();
+      timestamp = msg.getTimestamp();
+      priority = msg.getPriority();
+      properties = msg.getTypedProperties();
+   }
+   
    public HornetQBuffer getBodyBuffer()
    {
       if (bodyBuffer == null)
       {
-         if (buffer instanceof LargeMessageBufferInternal == false)
-         {
-            bodyBuffer = new ResetLimitWrappedHornetQBuffer(BODY_OFFSET, buffer, this);
-         }
-         else
-         {
-            return buffer;
-         }
+         bodyBuffer = new ResetLimitWrappedHornetQBuffer(BODY_OFFSET, buffer, this);
       }
 
       return bodyBuffer;
@@ -845,6 +850,11 @@ public abstract class MessageImpl implements MessageInternal
    {
       return new DecodingContext();
    }
+   
+   public TypedProperties getTypedProperties()
+   {
+      return this.properties;
+   }
 
    // Public --------------------------------------------------------
 
@@ -920,7 +930,7 @@ public abstract class MessageImpl implements MessageInternal
       bufferValid = true;
    }
 
-   private void createBody(final int initialMessageBufferSize)
+   protected void createBody(final int initialMessageBufferSize)
    {
       buffer = HornetQBuffers.dynamicBuffer(initialMessageBufferSize);
 

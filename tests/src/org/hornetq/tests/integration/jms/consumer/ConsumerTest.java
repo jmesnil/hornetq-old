@@ -13,6 +13,7 @@
 package org.hornetq.tests.integration.jms.consumer;
 
 import javax.jms.Connection;
+import javax.jms.ConnectionFactory;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageConsumer;
@@ -27,6 +28,7 @@ import org.hornetq.api.core.SimpleString;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.jms.HornetQJMSClient;
 import org.hornetq.api.jms.HornetQJMSConstants;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.server.Queue;
 import org.hornetq.jms.client.HornetQConnectionFactory;
@@ -50,7 +52,7 @@ public class ConsumerTest extends JMSTestBase
       super.setUp();
 
       jmsServer.createQueue(false, ConsumerTest.Q_NAME, null, true, ConsumerTest.Q_NAME);
-      cf = HornetQJMSClient.createConnectionFactory(new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
+      cf = (ConnectionFactory)HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration("org.hornetq.core.remoting.impl.invm.InVMConnectorFactory"));
    }
 
    @Override

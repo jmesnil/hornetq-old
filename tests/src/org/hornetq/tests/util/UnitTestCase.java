@@ -26,14 +26,17 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.naming.Context;
@@ -47,9 +50,12 @@ import junit.framework.TestSuite;
 import org.hornetq.api.core.HornetQBuffer;
 import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.SimpleString;
+import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientMessage;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.core.asyncio.impl.AsynchronousFileImpl;
+import org.hornetq.core.config.Configuration;
+import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.journal.impl.AIOSequentialFileFactory;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.persistence.impl.journal.OperationContextImpl;
@@ -93,39 +99,143 @@ public class UnitTestCase extends TestCase
 
    // Attributes ----------------------------------------------------
 
-   private final String testDir = System.getProperty("java.io.tmpdir", "/tmp") + "/hornetq-unit-test";
+   private static final String testDir = System.getProperty("java.io.tmpdir", "/tmp") + "/hornetq-unit-test";
+
+   
+   // There is a verification about thread leakages. We only fail a single thread when this happens
+   private static Set<Thread> alreadyFailedThread = new HashSet<Thread>();
 
    // Static --------------------------------------------------------
+
+   protected  Configuration createDefaultConfig()
+   {
+      return createDefaultConfig(false);
+   }
+
+   protected Configuration createDefaultConfig(final boolean netty)
+   {
+      if (netty)
+      {
+         return createDefaultConfig(new HashMap<String, Object>(),
+                                    INVM_ACCEPTOR_FACTORY,
+                                    NETTY_ACCEPTOR_FACTORY);
+      }
+      else
+      {
+         return createDefaultConfig(new HashMap<String, Object>(), INVM_ACCEPTOR_FACTORY);
+      }
+   }
+
+   protected static Configuration createClusteredDefaultConfig(final int index,
+                                                        final Map<String, Object> params,
+                                                        final String... acceptors)
+   {
+      Configuration config = createDefaultConfig(index, params, acceptors);
+
+      config.setClustered(true);
+
+      return config;
+   }
+
+   protected static Configuration createDefaultConfig(final int index,
+                                               final Map<String, Object> params,
+                                               final String... acceptors)
+   {
+      Configuration configuration = createBasicConfig(index);
+
+      configuration.getAcceptorConfigurations().clear();
+
+      for (String acceptor : acceptors)
+      {
+         TransportConfiguration transportConfig = new TransportConfiguration(acceptor, params);
+         configuration.getAcceptorConfigurations().add(transportConfig);
+      }
+
+      return configuration;
+   }
    
-   
+   protected static ConfigurationImpl createBasicConfig()
+   {
+      return createBasicConfig(0);
+   }
+
+
+   /**
+    * @param serverID
+    * @return
+    */
+   protected static ConfigurationImpl createBasicConfig(final int serverID)
+   {
+      ConfigurationImpl configuration = new ConfigurationImpl();
+      configuration.setSecurityEnabled(false);
+      configuration.setBindingsDirectory(getBindingsDir(serverID, false));
+      configuration.setJournalMinFiles(2);
+      configuration.setJournalDirectory(getJournalDir(serverID, false));
+      configuration.setJournalFileSize(100 * 1024);
+      configuration.setJournalType(getDefaultJournalType());
+      configuration.setPagingDirectory(getPageDir(serverID, false));
+      configuration.setLargeMessagesDirectory(getLargeMessagesDir(serverID, false));
+      configuration.setJournalCompactMinFiles(0);
+      configuration.setJournalCompactPercentage(0);
+      return configuration;
+   }
+
+   protected static Configuration createDefaultConfig(final Map<String, Object> params, final String... acceptors)
+   {
+      Configuration configuration = new ConfigurationImpl();
+      configuration.setSecurityEnabled(false);
+      configuration.setJMXManagementEnabled(false);
+      configuration.setBindingsDirectory(getBindingsDir());
+      configuration.setJournalMinFiles(2);
+      configuration.setJournalDirectory(getJournalDir());
+      configuration.setJournalFileSize(100 * 1024);
+      configuration.setPagingDirectory(getPageDir());
+      configuration.setLargeMessagesDirectory(getLargeMessagesDir());
+      configuration.setJournalCompactMinFiles(0);
+      configuration.setJournalCompactPercentage(0);
+
+      configuration.setFileDeploymentEnabled(false);
+
+      configuration.setJournalType(getDefaultJournalType());
+
+      configuration.getAcceptorConfigurations().clear();
+
+      for (String acceptor : acceptors)
+      {
+         TransportConfiguration transportConfig = new TransportConfiguration(acceptor, params);
+         configuration.getAcceptorConfigurations().add(transportConfig);
+      }
+
+      return configuration;
+   }
+
+
    protected static String getUDPDiscoveryAddress()
    {
       return System.getProperty("TEST-UDP-ADDRESS", "230.1.2.3");
    }
-   
+
    protected static String getUDPDiscoveryAddress(int variant)
    {
       String value = getUDPDiscoveryAddress();
-      
+
       int posPoint = value.lastIndexOf('.');
-      
-      int last = Integer.valueOf( value.substring(posPoint + 1) );
-      
+
+      int last = Integer.valueOf(value.substring(posPoint + 1));
+
       return value.substring(0, posPoint + 1) + (last + variant);
    }
-   
+
    public static int getUDPDiscoveryPort()
    {
       return Integer.parseInt(System.getProperty("TEST-UDP-PORT", "6750"));
    }
 
-   
    public static int getUDPDiscoveryPort(final int variant)
    {
       return getUDPDiscoveryPort() + 1;
    }
 
-   
    protected static JournalType getDefaultJournalType()
    {
       if (AsynchronousFileImpl.isLoaded())
@@ -137,7 +247,7 @@ public class UnitTestCase extends TestCase
          return JournalType.NIO;
       }
    }
-   
+
    /**
     * @param name
     */
@@ -168,16 +278,16 @@ public class UnitTestCase extends TestCase
       }
    }
 
-   public static void forceGC(WeakReference<?> ref, long timeout)
+   public static void forceGC(Reference<?> ref, long timeout)
    {
-      long waitUntil = System.currentTimeMillis() + timeout; 
+      long waitUntil = System.currentTimeMillis() + timeout;
       // A loop that will wait GC, using the minimal time as possible
       while (ref.get() != null && System.currentTimeMillis() < waitUntil)
       {
          ArrayList<String> list = new ArrayList<String>();
-         for (int i = 0 ; i < 1000; i++)
+         for (int i = 0; i < 1000; i++)
          {
-            list.add("Some string with garbage with concatenation "  + i);
+            list.add("Some string with garbage with concatenation " + i);
          }
          list.clear();
          list = null;
@@ -240,6 +350,8 @@ public class UnitTestCase extends TestCase
          out.println("Thread " + el.getKey() +
                      " name = " +
                      el.getKey().getName() +
+                     " id = " +
+                     el.getKey().getId() +
                      " group = " +
                      el.getKey().getThreadGroup());
          out.println();
@@ -327,6 +439,16 @@ public class UnitTestCase extends TestCase
       }
    }
 
+   public static void assertEqualsTransportConfigurations(final TransportConfiguration[] expected,
+                                                          final TransportConfiguration[] actual)
+   {
+      assertEquals(expected.length, actual.length);
+      for (int i = 0; i < expected.length; i++)
+      {
+         Assert.assertEquals("TransportConfiguration at index " + i, expected[i], actual[i]);
+      }
+   }
+
    public static void assertEqualsBuffers(final int size, final HornetQBuffer expected, final HornetQBuffer actual)
    {
       // assertEquals(expected.length, actual.length);
@@ -390,6 +512,28 @@ public class UnitTestCase extends TestCase
       return o;
    }
 
+   /**
+    * @param connectorConfigs
+    * @return
+    */
+   protected ArrayList<String> registerConnectors(final HornetQServer server,
+                                                  final List<TransportConfiguration> connectorConfigs)
+   {
+      // The connectors need to be pre-configured at main config object but this method is taking
+      // TransportConfigurations directly
+      // So this will first register them at the config and then generate a list of objects
+      ArrayList<String> connectors = new ArrayList<String>();
+      for (TransportConfiguration tnsp : connectorConfigs)
+      {
+         String name = RandomUtil.randomString();
+
+         server.getConfiguration().getConnectorConfigurations().put(name, tnsp);
+
+         connectors.add(name);
+      }
+      return connectors;
+   }
+
    protected static void checkFreePort(final int... ports)
    {
       for (int port : ports)
@@ -401,7 +545,8 @@ public class UnitTestCase extends TestCase
          }
          catch (Exception e)
          {
-            Assert.fail("port " + port + " is already bound");
+            System.out.println("port " + port + " is already bound");
+            System.exit(0);
          }
          finally
          {
@@ -450,22 +595,24 @@ public class UnitTestCase extends TestCase
       recreateDirectory(getLargeMessagesDir(testDir));
       recreateDirectory(getClientLargeMessagesDir(testDir));
       recreateDirectory(getTemporaryDir(testDir));
+
+      System.out.println("deleted " + testDir);
    }
 
    /**
     * @return the journalDir
     */
-   protected String getJournalDir()
+   public static String getJournalDir()
    {
       return getJournalDir(testDir);
    }
 
-   protected String getJournalDir(final String testDir)
+   protected static String getJournalDir(final String testDir)
    {
       return testDir + "/journal";
    }
 
-   protected String getJournalDir(final int index, final boolean backup)
+   protected static String getJournalDir(final int index, final boolean backup)
    {
       String dir = getJournalDir(testDir) + index + "-" + (backup ? "B" : "L");
 
@@ -475,7 +622,7 @@ public class UnitTestCase extends TestCase
    /**
     * @return the bindingsDir
     */
-   protected String getBindingsDir()
+   protected static String getBindingsDir()
    {
       return getBindingsDir(testDir);
    }
@@ -483,7 +630,7 @@ public class UnitTestCase extends TestCase
    /**
     * @return the bindingsDir
     */
-   protected String getBindingsDir(final String testDir)
+   protected static String getBindingsDir(final String testDir)
    {
       return testDir + "/bindings";
    }
@@ -491,7 +638,7 @@ public class UnitTestCase extends TestCase
    /**
     * @return the bindingsDir
     */
-   protected String getBindingsDir(final int index, final boolean backup)
+   protected static String getBindingsDir(final int index, final boolean backup)
    {
       return getBindingsDir(testDir) + index + "-" + (backup ? "B" : "L");
    }
@@ -499,7 +646,7 @@ public class UnitTestCase extends TestCase
    /**
     * @return the pageDir
     */
-   protected String getPageDir()
+   protected static String getPageDir()
    {
       return getPageDir(testDir);
    }
@@ -507,12 +654,12 @@ public class UnitTestCase extends TestCase
    /**
     * @return the pageDir
     */
-   protected String getPageDir(final String testDir)
+   protected static String getPageDir(final String testDir)
    {
       return testDir + "/page";
    }
 
-   protected String getPageDir(final int index, final boolean backup)
+   protected static String getPageDir(final int index, final boolean backup)
    {
       return getPageDir(testDir) + index + "-" + (backup ? "B" : "L");
    }
@@ -520,7 +667,7 @@ public class UnitTestCase extends TestCase
    /**
     * @return the largeMessagesDir
     */
-   protected String getLargeMessagesDir()
+   protected static String getLargeMessagesDir()
    {
       return getLargeMessagesDir(testDir);
    }
@@ -528,12 +675,12 @@ public class UnitTestCase extends TestCase
    /**
     * @return the largeMessagesDir
     */
-   protected String getLargeMessagesDir(final String testDir)
+   protected static String getLargeMessagesDir(final String testDir)
    {
       return testDir + "/large-msg";
    }
 
-   protected String getLargeMessagesDir(final int index, final boolean backup)
+   protected static String getLargeMessagesDir(final int index, final boolean backup)
    {
       return getLargeMessagesDir(testDir) + index + "-" + (backup ? "B" : "L");
    }
@@ -732,7 +879,12 @@ public class UnitTestCase extends TestCase
 
       deleteDirectory(new File(getTestDir()));
 
-      Assert.assertEquals(0, InVMRegistry.instance.size());
+      int invmSize =  InVMRegistry.instance.size();
+      if(invmSize > 0)
+      {
+         InVMRegistry.instance.clear();
+         fail("invm registry still had acceptors registered");
+      }
 
       if (AsynchronousFileImpl.getTotalMaxIO() != 0)
       {
@@ -740,6 +892,26 @@ public class UnitTestCase extends TestCase
          Assert.fail("test did not close all its files " + AsynchronousFileImpl.getTotalMaxIO());
       }
 
+      Map<Thread, StackTraceElement[]> threadMap = Thread.getAllStackTraces();
+      for (Thread thread : threadMap.keySet())
+      {
+         StackTraceElement[] stack = threadMap.get(thread);
+         for (StackTraceElement stackTraceElement : stack)
+         {
+            if (stackTraceElement.getMethodName().contains("getConnectionWithRetry") && !alreadyFailedThread.contains(thread))
+            {
+               alreadyFailedThread.add(thread);
+               System.out.println(threadDump(this.getName() + " has left threads running. Look at thread " +
+                                             thread.getName() +
+                                             " id = " +
+                                             thread.getId() +
+                                             " has running locators on test " +
+                                             this.getName() + " on this following dump"));
+               fail("test left serverlocator running, this could effect other tests");
+               // System.exit(0);
+            }
+         }
+      }
       super.tearDown();
    }
 

@@ -45,6 +45,7 @@ import org.hornetq.core.protocol.core.impl.wireformat.ReattachSessionMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.ReattachSessionResponseMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.RollbackMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.SessionAcknowledgeMessage;
+import org.hornetq.core.protocol.core.impl.wireformat.SessionAddMetaDataMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.SessionBindingQueryMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.SessionBindingQueryResponseMessage;
 import org.hornetq.core.protocol.core.impl.wireformat.SessionCloseMessage;
@@ -108,7 +109,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
 
    // Attributes ----------------------------------------------------------------------------
 
-   private final FailoverManager failoverManager;
+   private final ClientSessionFactoryInternal sessionFactory;
 
    private final String name;
 
@@ -154,6 +155,8 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
    private final boolean blockOnDurableSend;
 
    private final int minLargeMessageSize;
+   
+   private final boolean compressLargeMessages;
 
    private volatile int initialMessagePacketSize;
 
@@ -181,10 +184,12 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
    private final String groupID;
 
    private volatile boolean inClose;
+   
+   private volatile SimpleString defaultAddress;
 
    // Constructors ----------------------------------------------------------------------------
 
-   public ClientSessionImpl(final FailoverManager connectionManager,
+   public ClientSessionImpl(final ClientSessionFactoryInternal sessionFactory,
                             final String name,
                             final String username,
                             final String password,
@@ -204,6 +209,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
                             final boolean blockOnDurableSend,
                             final boolean cacheLargeMessageClient,
                             final int minLargeMessageSize,
+                            final boolean compressLargeMessages,
                             final int initialMessagePacketSize,
                             final String groupID,
                             final CoreRemotingConnection remotingConnection,
@@ -211,7 +217,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
                             final Channel channel,
                             final Executor executor) throws HornetQException
    {
-      failoverManager = connectionManager;
+      this.sessionFactory = sessionFactory;
 
       this.name = name;
 
@@ -256,6 +262,8 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
       this.cacheLargeMessageClient = cacheLargeMessageClient;
 
       this.minLargeMessageSize = minLargeMessageSize;
+      
+      this.compressLargeMessages = compressLargeMessages;
 
       this.initialMessagePacketSize = initialMessagePacketSize;
 
@@ -266,7 +274,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
 
    // ClientSession implementation
    // -----------------------------------------------------------------
-
+   
    public void createQueue(final SimpleString address, final SimpleString queueName) throws HornetQException
    {
       internalCreateQueue(address, queueName, null, false, false);
@@ -641,15 +649,32 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
    {
       stop(true);
    }
+   
+   public void stop(final boolean waitForOnMessage) throws HornetQException
+   {
+      checkClosed();
+
+      if (started)
+      {
+         for (ClientConsumerInternal clientConsumerInternal : consumers.values())
+         {
+            clientConsumerInternal.stop(waitForOnMessage);
+         }
+
+         channel.sendBlocking(new PacketImpl(PacketImpl.SESS_STOP));
+
+         started = false;
+      }
+   }
 
    public void addFailureListener(final SessionFailureListener listener)
    {
-      failoverManager.addFailureListener(listener);
+      sessionFactory.addFailureListener(listener);
    }
 
    public boolean removeFailureListener(final SessionFailureListener listener)
    {
-      return failoverManager.removeFailureListener(listener);
+      return sessionFactory.removeFailureListener(listener);
    }
 
    public int getVersion()
@@ -663,6 +688,11 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
    public int getMinLargeMessageSize()
    {
       return minLargeMessageSize;
+   }
+   
+   public boolean isCompressLargeMessages()
+   {
+      return compressLargeMessages;
    }
 
    /**
@@ -819,10 +849,10 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
          ClientSessionImpl.log.trace("Failed to close session", e);
       }
 
-      doCleanup();
+      doCleanup(false);
    }
 
-   public synchronized void cleanUp() throws Exception
+   public synchronized void cleanUp(boolean failingOver) throws Exception
    {
       if (closed)
       {
@@ -833,7 +863,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
 
       cleanUpChildren();
 
-      doCleanup();
+      doCleanup(failingOver);
    }
 
    public void setSendAcknowledgementHandler(final SendAcknowledgementHandler handler)
@@ -1035,8 +1065,11 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
          // not having any credits to send
       }
    }
-
-   private volatile SimpleString defaultAddress;
+   
+   public ClientSessionFactoryInternal getSessionFactory()
+   {
+      return sessionFactory;
+   }
 
    public void setAddress(final Message message, final SimpleString address)
    {
@@ -1086,11 +1119,6 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
    public void returnBlocking()
    {
       channel.returnBlocking();
-   }
-
-   public FailoverManager getConnectionManager()
-   {
-      return failoverManager;
    }
 
    public void sendProducerCreditsMessage(final int credits, final SimpleString address)
@@ -1282,7 +1310,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
 
       ClientSessionInternal other = (ClientSessionInternal)xares;
 
-      return failoverManager == other.getConnectionManager();
+      return sessionFactory == other.getSessionFactory();
    }
 
    public int prepare(final Xid xid) throws XAException
@@ -1470,11 +1498,11 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
 
    // FailureListener implementation --------------------------------------------
 
-   public void connectionFailed(final HornetQException me)
+   public void connectionFailed(final HornetQException me, boolean failedOver)
    {
       try
       {
-         cleanUp();
+         cleanUp(false);
       }
       catch (Exception e)
       {
@@ -1645,13 +1673,13 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
 
    private void checkClosed() throws HornetQException
    {
-      if (closed)
+      if (closed || inClose)
       {
          throw new HornetQException(HornetQException.OBJECT_CLOSED, "Session is closed");
       }
    }
 
-   private void doCleanup()
+   private void doCleanup(boolean failingOver)
    {
       remotingConnection.removeFailureListener(this);
 
@@ -1662,7 +1690,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
          channel.close();
       }
 
-      failoverManager.removeSession(this);
+      sessionFactory.removeSession(this, failingOver);
    }
 
    private void cleanUpChildren() throws Exception
@@ -1707,22 +1735,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
       }
    }
 
-   public void stop(final boolean waitForOnMessage) throws HornetQException
-   {
-      checkClosed();
 
-      if (started)
-      {
-         for (ClientConsumerInternal clientConsumerInternal : consumers.values())
-         {
-            clientConsumerInternal.stop(waitForOnMessage);
-         }
-
-         channel.sendBlocking(new PacketImpl(PacketImpl.SESS_STOP));
-
-         started = false;
-      }
-   }
 
    private static class BindingQueryImpl implements BindingQuery
    {
@@ -1755,7 +1768,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
 
       private final boolean durable;
 
-      private final int messageCount;
+      private final long messageCount;
 
       private final SimpleString filterString;
 
@@ -1765,7 +1778,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
 
       public QueueQueryImpl(final boolean durable,
                             final int consumerCount,
-                            final int messageCount,
+                            final long messageCount,
                             final SimpleString filterString,
                             final SimpleString address,
                             final boolean exists)
@@ -1794,7 +1807,7 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
          return filterString;
       }
 
-      public int getMessageCount()
+      public long getMessageCount()
       {
          return messageCount;
       }
@@ -1809,5 +1822,10 @@ public class ClientSessionImpl implements ClientSessionInternal, FailureListener
          return exists;
       }
 
+   }
+
+   public void addMetaData(String key, String data) throws HornetQException
+   {
+      channel.sendBlocking(new SessionAddMetaDataMessage(key, data));
    }
 }

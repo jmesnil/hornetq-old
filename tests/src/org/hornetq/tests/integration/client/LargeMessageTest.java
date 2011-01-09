@@ -59,6 +59,8 @@ public class LargeMessageTest extends LargeMessageTestBase
    // Static --------------------------------------------------------
    private final Logger log = Logger.getLogger(LargeMessageTest.class);
 
+   protected ServerLocator locator;
+
    // Constructors --------------------------------------------------
 
    // Public --------------------------------------------------------
@@ -80,7 +82,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -168,7 +170,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(!transacted, !transacted, 0);
 
@@ -252,7 +254,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -305,7 +307,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         sf = createFactory(isNetty());
+         sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -379,7 +381,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -462,7 +464,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          SimpleString ADDRESS_DLA = LargeMessageTest.ADDRESS.concat("-dla");
          SimpleString ADDRESS_EXPIRY = LargeMessageTest.ADDRESS.concat("-expiry");
@@ -597,7 +599,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          SimpleString ADDRESS_DLA = LargeMessageTest.ADDRESS.concat("-dla");
          SimpleString ADDRESS_EXPIRY = LargeMessageTest.ADDRESS.concat("-expiry");
@@ -673,7 +675,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         sf = createFactory(isNetty());
+         sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -740,7 +742,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.getAddressSettingsRepository().addMatch("*", addressSettings);
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -782,7 +784,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         sf = createFactory(isNetty());
+         sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -839,6 +841,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
    public void internalTestResendMessage(final long messageSize) throws Exception
    {
+      clearData();
       ClientSession session = null;
 
       try
@@ -847,7 +850,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -877,18 +880,6 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          producer2.send(msg1);
 
-         boolean failed = false;
-
-         try
-         {
-            producer2.send(msg1);
-         }
-         catch (Throwable e)
-         {
-            failed = true;
-         }
-
-         Assert.assertTrue("Exception expected", failed);
 
          session.commit();
 
@@ -948,11 +939,12 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
          
-         sf.setMinLargeMessageSize(111);
+         locator.setMinLargeMessageSize(200);
          
-         sf.setCacheLargeMessagesClient(true);
+         locator.setCacheLargeMessagesClient(true);
+
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
@@ -1884,7 +1876,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          SimpleString queue[] = new SimpleString[] { new SimpleString("queue1"), new SimpleString("queue2") };
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          ClientSession session = sf.createSession(null, null, false, true, true, false, 0);
 
@@ -1967,7 +1959,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          SimpleString queue[] = new SimpleString[] { new SimpleString("queue1"), new SimpleString("queue2") };
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          ClientSession session = sf.createSession(null, null, false, true, true, false, 0);
 
@@ -1995,7 +1987,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
             server.start();
 
-            sf = createFactory(isNetty());
+            sf = locator.createSessionFactory();
 
             session = sf.createSession(null, null, false, true, true, false, 0);
          }
@@ -2049,7 +2041,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(isXA, false, false);
 
@@ -2079,7 +2071,7 @@ public class LargeMessageTest extends LargeMessageTestBase
             session.close();
             server.stop();
             server.start();
-
+            sf = locator.createSessionFactory();
             session = sf.createSession(isXA, false, false);
 
             session.rollback(xid);
@@ -2136,7 +2128,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          ClientSession session = sf.createSession(isXA, false, false);
 
@@ -2203,7 +2195,7 @@ public class LargeMessageTest extends LargeMessageTestBase
 
                Assert.assertNotNull(clientMessage);
 
-               Assert.assertEquals(numberOfBytes, clientMessage.getBodyBuffer().writerIndex());
+               Assert.assertEquals(numberOfBytes, clientMessage.getBodySize());
 
                clientMessage.acknowledge();
 
@@ -2270,10 +2262,10 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         locator.setMinLargeMessageSize(1024);
+         locator.setConsumerWindowSize(1024 * 1024);
 
-         sf.setMinLargeMessageSize(1024);
-         sf.setConsumerWindowSize(1024 * 1024);
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(null, null, false, false, false, false, 0);
 
@@ -2373,10 +2365,11 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
 
-         sf.setMinLargeMessageSize(1024);
-         sf.setConsumerWindowSize(1024 * 1024);
+         locator.setMinLargeMessageSize(1024);
+         locator.setConsumerWindowSize(1024 * 1024);
+
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(null, null, false, false, false, false, 0);
 
@@ -2476,9 +2469,10 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
 
-         sf.setMinLargeMessageSize(100 * 1024);
+         locator.setMinLargeMessageSize(100 * 1024);
+
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(null, null, false, true, true, false, 0);
 
@@ -2550,9 +2544,9 @@ public class LargeMessageTest extends LargeMessageTestBase
 
          server.start();
 
-         ClientSessionFactory sf = createFactory(isNetty());
+         locator.setMinLargeMessageSize(1024);
 
-         sf.setMinLargeMessageSize(1024);
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          session = sf.createSession(null, null, false, true, true, false, 0);
 
@@ -2628,21 +2622,25 @@ public class LargeMessageTest extends LargeMessageTestBase
 
       server.start();
 
-      ClientSessionFactory sf = createFactory(false);
+      ClientSessionFactory sf = locator.createSessionFactory();
 
       ClientSession session = sf.createSession(false, false);
 
       try
       {
          LargeServerMessageImpl fileMessage = new LargeServerMessageImpl((JournalStorageManager)server.getStorageManager());
-
+         
          fileMessage.setMessageID(1005);
 
          for (int i = 0; i < LARGE_MESSAGE_SIZE; i++)
          {
             fileMessage.addBytes(new byte[] { UnitTestCase.getSamplebyte(i) });
          }
+         
+         // The server would be doing this
+         fileMessage.putLongProperty(Message.HDR_LARGE_BODY_SIZE, LARGE_MESSAGE_SIZE);
 
+ 
          fileMessage.releaseResources();
 
          session.createQueue(LargeMessageTest.ADDRESS, LargeMessageTest.ADDRESS, true);
@@ -2691,6 +2689,7 @@ public class LargeMessageTest extends LargeMessageTestBase
    {
       super.setUp();
       clearData();
+      locator = createFactory(isNetty());
       log.info("\n*********************************************************************************\n Starting " + getName() +
                "\n*********************************************************************************");
    }
@@ -2700,6 +2699,7 @@ public class LargeMessageTest extends LargeMessageTestBase
    {
       log.info("\n*********************************************************************************\nDone with  " + getName() +
                "\n*********************************************************************************");
+      locator.close();
       super.tearDown();
    }
 
@@ -2724,13 +2724,13 @@ public class LargeMessageTest extends LargeMessageTestBase
 
       try
       {
-         ClientSessionFactory sf = createFactory(isNetty());
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          if (sendBlocking)
          {
-            sf.setBlockOnNonDurableSend(true);
-            sf.setBlockOnDurableSend(true);
-            sf.setBlockOnAcknowledge(true);
+            sf.getServerLocator().setBlockOnNonDurableSend(true);
+            sf.getServerLocator().setBlockOnDurableSend(true);
+            sf.getServerLocator().setBlockOnAcknowledge(true);
          }
 
          ClientSession session = sf.createSession(null, null, false, true, true, false, 0);
@@ -2769,7 +2769,7 @@ public class LargeMessageTest extends LargeMessageTestBase
             server = createServer(true, config, PAGE_SIZE, PAGE_MAX, map);
             server.start();
 
-            sf = createFactory(isNetty());
+            sf = locator.createSessionFactory();
          }
 
          session = sf.createSession(null, null, false, true, true, false, 0);

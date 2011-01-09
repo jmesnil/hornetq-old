@@ -27,6 +27,7 @@ import junit.framework.Assert;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.management.ObjectNameBuilder;
 import org.hornetq.api.jms.HornetQJMSClient;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.api.jms.management.JMSManagementHelper;
 import org.hornetq.api.jms.management.JMSServerControl;
 import org.hornetq.core.config.Configuration;
@@ -109,7 +110,7 @@ public class JMSServerControlRestartTest extends ManagementTestBase
       checkNoResource(ObjectNameBuilder.DEFAULT.getJMSQueueObjectName(queueName));
 
       TransportConfiguration config = new TransportConfiguration(InVMConnectorFactory.class.getName());
-      Connection connection = HornetQJMSClient.createConnectionFactory(config).createConnection();
+      Connection connection = HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, config).createConnection();
       connection.start();
       Queue managementQueue = HornetQJMSClient.createQueue("hornetq.management");
       QueueSession session = (QueueSession) connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
@@ -155,7 +156,7 @@ public class JMSServerControlRestartTest extends ManagementTestBase
    }
 
    private JMSServerManager createJMSServer() throws Exception {
-      Configuration conf = new ConfigurationImpl();
+      Configuration conf = createDefaultConfig();
       conf.setSecurityEnabled(false);
       conf.setJMXManagementEnabled(true);
       conf.setPersistenceEnabled(true);

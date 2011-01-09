@@ -13,9 +13,7 @@
 
 package org.hornetq.api.jms.management;
 
-import java.util.List;
-
-import org.hornetq.api.core.Pair;
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.management.Operation;
@@ -43,6 +41,18 @@ public interface ConnectionFactoryControl
     * Returns the JNDI bindings associated  to this connection factory.
     */
    String[] getJNDIBindings();
+
+   /**
+    * does ths cf support HA
+    * @return true if it supports HA
+    */
+   boolean isHA();
+
+   /**
+   * return the type of factory
+    * @return 0 = jms cf, 1 = queue cf, 2 = topic cf, 3 = xa cf, 4 = xa queue cf, 5 = xa topic cf
+   */
+   int getFactoryType();
 
    /**
     * Returns the Client ID of this connection factory (or {@code null} if it is not set.
@@ -250,35 +260,6 @@ public interface ConnectionFactoryControl
     */
    void setFailoverOnInitialConnection(boolean failoverOnInitialConnection);
 
-   /**
-    * @see ClientSessionFactory#isFailoverOnServerShutdown()
-    */
-   boolean isFailoverOnServerShutdown();
-
-    /**
-    * @see ClientSessionFactory#setFailoverOnServerShutdown(boolean)
-    */
-   void setFailoverOnServerShutdown(boolean failoverOnServerShutdown);
-
-    /**
-    * @see org.hornetq.api.core.client.ClientSessionFactory#getDiscoveryRefreshTimeout()
-    */
-   long getDiscoveryRefreshTimeout();
-
-    /**
-    * @see ClientSessionFactory#setDiscoveryRefreshTimeout(long)
-    */
-   void setDiscoveryRefreshTimeout(long discoveryRefreshTimeout);
-
-    /**
-    * @see org.hornetq.api.core.client.ClientSessionFactory#getDiscoveryInitialWaitTimeout()
-    */
-   long getDiscoveryInitialWaitTimeout();
-
-    /**
-    * @see ClientSessionFactory#setDiscoveryInitialWaitTimeout(long)
-    */
-   void setDiscoveryInitialWaitTimeout(long discoveryInitialWaitTimeout);
 
     /**
     * @see org.hornetq.api.core.client.ClientSessionFactory#getProducerWindowSize()
@@ -373,44 +354,12 @@ public interface ConnectionFactoryControl
     /**
     * @see ClientSessionFactory#getStaticConnectors()
     */
-   List<Pair<TransportConfiguration, TransportConfiguration>> getStaticConnectors();
-
-    /**
-    * @see ClientSessionFactory#setStaticConnectors(java.util.List)
-    */
-   void setStaticConnectors(List<Pair<TransportConfiguration, TransportConfiguration>> staticConnectors);
+   TransportConfiguration[] getStaticConnectors();
 
    /**
-    * @see ClientSessionFactory#getLocalBindAddress()
+    * get the discovery group configuration
     */
-   String getLocalBindAddress();
-
-    /**
-    * @see ClientSessionFactory#setLocalBindAddress(String)
-    */
-   void setLocalBindAddress(String localBindAddress);
-   
-    /**
-    * @see ClientSessionFactory#getDiscoveryAddress()
-    */
-   String getDiscoveryAddress();
-
-    /**
-    * @see ClientSessionFactory#setDiscoveryAddress(String)
-    */
-   void setDiscoveryAddress(String discoveryAddress);
-   
-   
-
-    /**
-    * @see ClientSessionFactory#getDiscoveryPort()
-    */
-   int getDiscoveryPort();
-
-    /**
-    * @see ClientSessionFactory#setDiscoveryPort(int)
-    */
-   void setDiscoveryPort(int discoveryPort);
+   DiscoveryGroupConfiguration getDiscoveryGroupConfiguration();
 
    /**
     * Add the JNDI binding to this destination

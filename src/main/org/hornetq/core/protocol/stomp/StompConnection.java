@@ -52,6 +52,8 @@ public class StompConnection implements RemotingConnection
    private boolean valid;
 
    private boolean destroyed = false;
+   
+   private final long creationTime;
 
    private StompDecoder decoder = new StompDecoder();
 
@@ -73,6 +75,8 @@ public class StompConnection implements RemotingConnection
       this.transportConnection = transportConnection;
 
       this.manager = manager;
+      
+      this.creationTime = System.currentTimeMillis();
    }
 
    public void addFailureListener(final FailureListener listener)
@@ -239,6 +243,11 @@ public class StompConnection implements RemotingConnection
    {
       return transportConnection.getRemoteAddress();
    }
+   
+   public long getCreationTime()
+   {
+      return creationTime;
+   }
 
    public Connection getTransportConnection()
    {
@@ -308,7 +317,7 @@ public class StompConnection implements RemotingConnection
       {
          try
          {
-            listener.connectionFailed(me);
+            listener.connectionFailed(me, false);
          }
          catch (final Throwable t)
          {

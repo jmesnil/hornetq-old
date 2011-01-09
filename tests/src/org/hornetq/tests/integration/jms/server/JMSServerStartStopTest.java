@@ -24,6 +24,7 @@ import junit.framework.Assert;
 
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.jms.HornetQJMSClient;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.core.config.impl.FileConfiguration;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.remoting.impl.netty.NettyConnectorFactory;
@@ -71,7 +72,7 @@ public class JMSServerStartStopTest extends UnitTestCase
 
          start();
 
-         HornetQConnectionFactory jbcf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration(NettyConnectorFactory.class.getCanonicalName()));
+         HornetQConnectionFactory jbcf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration(NettyConnectorFactory.class.getCanonicalName()));
 
          jbcf.setBlockOnDurableSend(true);
          jbcf.setBlockOnNonDurableSend(true);
@@ -98,7 +99,7 @@ public class JMSServerStartStopTest extends UnitTestCase
 
       start();
 
-      HornetQConnectionFactory jbcf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration(NettyConnectorFactory.class.getCanonicalName()));
+      HornetQConnectionFactory jbcf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration(NettyConnectorFactory.class.getCanonicalName()));
 
       jbcf.setBlockOnDurableSend(true);
       jbcf.setBlockOnNonDurableSend(true);
@@ -134,7 +135,7 @@ public class JMSServerStartStopTest extends UnitTestCase
    {
       start();
       
-      HornetQConnectionFactory jbcf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration(NettyConnectorFactory.class.getCanonicalName()));
+      HornetQConnectionFactory jbcf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration(NettyConnectorFactory.class.getCanonicalName()));
 
       jbcf.setBlockOnDurableSend(true);
       jbcf.setBlockOnNonDurableSend(true);

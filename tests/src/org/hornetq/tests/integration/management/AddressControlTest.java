@@ -27,18 +27,19 @@ import org.hornetq.api.core.client.ClientProducer;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.api.core.management.AddressControl;
 import org.hornetq.api.core.management.RoleInfo;
 import org.hornetq.core.config.Configuration;
 import org.hornetq.core.config.impl.ConfigurationImpl;
 import org.hornetq.core.remoting.impl.invm.InVMAcceptorFactory;
-import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
 import org.hornetq.core.security.CheckType;
 import org.hornetq.core.security.Role;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.HornetQServers;
 import org.hornetq.core.settings.impl.AddressSettings;
 import org.hornetq.tests.util.RandomUtil;
+import org.hornetq.tests.util.UnitTestCase;
 
 /**
  * A QueueControlTest
@@ -56,6 +57,7 @@ public class AddressControlTest extends ManagementTestBase
    private HornetQServer server;
 
    protected ClientSession session;
+   private ServerLocator locator;
 
    // Static --------------------------------------------------------
 
@@ -223,7 +225,8 @@ public class AddressControlTest extends ManagementTestBase
       server.getAddressSettingsRepository().addMatch(address.toString(), addressSettings);
       server.start();
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      ClientSessionFactory sf = locator.createSessionFactory();
       session = sf.createSession(false, true, false);
       session.start();
       session.createQueue(address, address, true);
@@ -279,7 +282,8 @@ public class AddressControlTest extends ManagementTestBase
 
       server.getAddressSettingsRepository().addMatch(address.toString(), addressSettings);
       server.start();
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      ClientSessionFactory sf = locator.createSessionFactory();
       session = sf.createSession(false, true, false);
       session.createQueue(address, address, true);
       Assert.assertEquals(1024, addressControl.getNumberOfBytesPerPage());
@@ -294,16 +298,17 @@ public class AddressControlTest extends ManagementTestBase
    {
       super.setUp();
 
-      Configuration conf = new ConfigurationImpl();
+      Configuration conf = createBasicConfig();
       conf.setSecurityEnabled(false);
       conf.setJMXManagementEnabled(true);
       conf.getAcceptorConfigurations().add(new TransportConfiguration(InVMAcceptorFactory.class.getName()));
       server = HornetQServers.newHornetQServer(conf, mbeanServer, false);
       server.start();
 
-      ClientSessionFactory sf = HornetQClient.createClientSessionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
-      sf.setBlockOnNonDurableSend(true);
-      sf.setBlockOnNonDurableSend(true);
+      locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      locator.setBlockOnNonDurableSend(true);
+      locator.setBlockOnNonDurableSend(true);
+      ClientSessionFactory sf = locator.createSessionFactory();
       session = sf.createSession(false, true, false);
       session.start();
    }
@@ -312,6 +317,8 @@ public class AddressControlTest extends ManagementTestBase
    protected void tearDown() throws Exception
    {
       session.close();
+
+      locator.close();
 
       server.stop();
 

@@ -13,13 +13,11 @@
 
 package org.hornetq.jms.management.impl;
 
-import java.util.List;
-
 import javax.management.MBeanInfo;
 import javax.management.NotCompliantMBeanException;
 import javax.management.StandardMBean;
 
-import org.hornetq.api.core.Pair;
+import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.management.Parameter;
 import org.hornetq.api.jms.management.ConnectionFactoryControl;
@@ -68,6 +66,16 @@ public class JMSConnectionFactoryControlImpl extends StandardMBean implements Co
       return jmsManager.getJNDIOnConnectionFactory(name);
    }
 
+   public boolean isHA()
+   {
+      return cf.isHA();
+   }
+
+   public int getFactoryType()
+   {
+      return cf.getFactoryType();
+   }
+
    public String getClientID()
    {
       return cf.getClientID();
@@ -78,29 +86,9 @@ public class JMSConnectionFactoryControlImpl extends StandardMBean implements Co
       return cf.getClientFailureCheckPeriod();
    }
 
-   public long getDiscoveryRefreshTimeout()
-   {
-      return cf.getDiscoveryRefreshTimeout();
-   }
-
    public String getConnectionLoadBalancingPolicyClassName()
    {
       return cf.getConnectionLoadBalancingPolicyClassName();
-   }
-
-   public void setDiscoveryRefreshTimeout(long discoveryRefreshTimeout)
-   {
-      cf.setDiscoveryRefreshTimeout(discoveryRefreshTimeout);
-   }
-
-   public long getDiscoveryInitialWaitTimeout()
-   {
-      return cf.getDiscoveryInitialWaitTimeout();
-   }
-
-   public void setDiscoveryInitialWaitTimeout(long discoveryInitialWaitTimeout)
-   {
-      cf.setDiscoveryInitialWaitTimeout(discoveryInitialWaitTimeout);
    }
 
    public void setClientID(String clientID)
@@ -223,11 +211,6 @@ public class JMSConnectionFactoryControlImpl extends StandardMBean implements Co
       cf.setFailoverOnInitialConnection(failover);
    }
 
-   public void setFailoverOnServerShutdown(boolean failoverOnServerShutdown)
-   {
-      cf.setFailoverOnServerShutdown(failoverOnServerShutdown);
-   }
-
    public boolean isUseGlobalPools()
    {
       return cf.isUseGlobalPools();
@@ -293,44 +276,14 @@ public class JMSConnectionFactoryControlImpl extends StandardMBean implements Co
       cf.setConnectionLoadBalancingPolicyClassName(connectionLoadBalancingPolicyClassName);
    }
 
-   public List<Pair<TransportConfiguration, TransportConfiguration>> getStaticConnectors()
+   public TransportConfiguration[] getStaticConnectors()
    {
       return cf.getStaticConnectors();
    }
 
-   public void setStaticConnectors(List<Pair<TransportConfiguration, TransportConfiguration>> staticConnectors)
+   public DiscoveryGroupConfiguration getDiscoveryGroupConfiguration()
    {
-      cf.setStaticConnectors(staticConnectors);
-   }
-   
-   public String getLocalBindAddress()
-   {
-      return cf.getLocalBindAddress();
-   }
-
-   public void setLocalBindAddress(String localBindAddress)
-   {
-      cf.setLocalBindAddress(localBindAddress);
-   }
-
-   public String getDiscoveryAddress()
-   {
-      return cf.getDiscoveryAddress();
-   }
-
-   public void setDiscoveryAddress(String discoveryAddress)
-   {
-      cf.setDiscoveryAddress(discoveryAddress);
-   }
-
-   public int getDiscoveryPort()
-   {
-      return cf.getDiscoveryPort();
-   }
-
-   public void setDiscoveryPort(int discoveryPort)
-   {
-      cf.setDiscoveryPort(discoveryPort);
+      return cf.getDiscoveryGroupConfiguration();
    }
 
    public void addJNDI(@Parameter(name = "jndiBinding", desc = "the name of the binding for JNDI") String jndi) throws Exception
@@ -406,11 +359,6 @@ public class JMSConnectionFactoryControlImpl extends StandardMBean implements Co
    public boolean isFailoverOnInitialConnection()
    {
       return cf.isFailoverOnInitialConnection();
-   }
-
-   public boolean isFailoverOnServerShutdown()
-   {
-      return cf.isFailoverOnServerShutdown();
    }
 
    public int getMinLargeMessageSize()

@@ -13,7 +13,6 @@
 
 package org.hornetq.tests.integration.jms.server.management;
 
-import java.util.Map;
 import java.util.Set;
 
 import javax.jms.QueueConnection;
@@ -21,14 +20,13 @@ import javax.jms.QueueSession;
 import javax.jms.Session;
 
 import org.hornetq.api.core.TransportConfiguration;
-import org.hornetq.api.core.management.Parameter;
 import org.hornetq.api.core.management.ResourceNames;
 import org.hornetq.api.jms.HornetQJMSClient;
+import org.hornetq.api.jms.JMSFactoryType;
 import org.hornetq.api.jms.management.JMSServerControl;
 import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
 import org.hornetq.core.security.Role;
 import org.hornetq.jms.client.HornetQConnectionFactory;
-import org.hornetq.jms.client.HornetQDestination;
 import org.hornetq.jms.client.HornetQQueue;
 
 /**
@@ -62,13 +60,19 @@ public class JMSServerControlUsingJMSTest extends JMSServerControlTest
    // Constructors --------------------------------------------------
 
    // JMSServerControlTest overrides --------------------------------
+   @Override
+   protected int getNumberOfConsumers()
+   {
+      return 1;
+   }
+
 
    @Override
    protected void setUp() throws Exception
    {
       super.setUp();
 
-      HornetQConnectionFactory cf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      HornetQConnectionFactory cf = (HornetQConnectionFactory) HornetQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration(InVMConnectorFactory.class.getName()));
       connection = cf.createQueueConnection();
       session = connection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
       connection.start();
@@ -95,74 +99,6 @@ public class JMSServerControlUsingJMSTest extends JMSServerControlTest
       return new JMSServerControl()
       {
 
-
-         public void createConnectionFactory(final String name,
-                                             final String discoveryAddress,
-                                             final int discoveryPort,
-                                             final Object[] jndiBindings) throws Exception
-         {
-            proxy.invokeOperation("createConnectionFactory",
-                                  name,
-                                  discoveryAddress,
-                                  discoveryPort,
-                                  jndiBindings);
-         }
-
-         public void createConnectionFactory(final String name,
-                                             final String discoveryAddress,
-                                             final int discoveryPort,
-                                             final String jndiBindings) throws Exception
-         {
-            proxy.invokeOperation("createConnectionFactory",
-                                  name,
-                                  discoveryAddress,
-                                  discoveryPort,
-                                  jndiBindings);
-         }
-
-         public void createConnectionFactory(final String name,
-                                             final Object[] liveConnectorsTransportClassNames,
-                                             final Object[] liveConnectorTransportParams,
-                                             final Object[] backupConnectorsTransportClassNames,
-                                             final Object[] backupConnectorTransportParams,
-                                             final Object[] jndiBindings) throws Exception
-         {
-            proxy.invokeOperation("createConnectionFactory",
-                                  name,
-                                  liveConnectorsTransportClassNames,
-                                  liveConnectorTransportParams,
-                                  backupConnectorsTransportClassNames,
-                                  backupConnectorTransportParams,
-                                  jndiBindings);
-         }
-
-         public void createConnectionFactory(String name,
-                                             String liveTransportClassNames,
-                                             String liveTransportParams,
-                                             String backupTransportClassNames,
-                                             String backupTransportParams,
-                                             String jndiBindings) throws Exception
-         {
-            proxy.invokeOperation("createConnectionFactory",
-                  name,
-                  liveTransportClassNames,
-                  liveTransportParams,
-                  backupTransportClassNames,
-                  backupTransportParams,
-                  jndiBindings);
-         }
-
-         public void createConnectionFactory(String name,
-                                             String liveTransportClassName,
-                                             Map<String, Object> liveTransportParams,
-                                             Object[] jndiBindings) throws Exception
-         {
-            proxy.invokeOperation("createConnectionFactory",
-                                  name,
-                                  liveTransportClassName,
-                                  liveTransportParams,
-                                  jndiBindings);
-         }
 
          public boolean closeConnectionsForAddress(final String ipAddress) throws Exception
          {
@@ -233,6 +169,16 @@ public class JMSServerControlUsingJMSTest extends JMSServerControlTest
          {
             return (String[])proxy.invokeOperation("listConnectionIDs");
          }
+         
+         public String listConnectionsAsJSON() throws Exception
+         {
+            return (String)proxy.invokeOperation("listConnectionsAsJSON");
+         }
+         
+         public String listConsumersAsJSON(String connectionID) throws Exception
+         {
+            return (String)proxy.invokeOperation("listConsumersAsJSON", connectionID);
+         }
 
          public String[] listRemoteAddresses() throws Exception
          {
@@ -274,6 +220,58 @@ public class JMSServerControlUsingJMSTest extends JMSServerControlTest
          {
             return (Boolean)proxy.invokeOperation("createTopic", name, jndiBinding);
          }
+
+         public String[] listTargetDestinations(String sessionID) throws Exception
+         {
+            return null;
+         }
+
+         public String getLastSentMessageID(String sessionID, String address) throws Exception
+         {
+            return null;
+         }
+
+         public String getSessionCreationTime(String sessionID) throws Exception
+         {
+            return (String)proxy.invokeOperation("getSessionCreationTime", sessionID);
+         }
+
+         public String listSessionsAsJSON(String connectionID) throws Exception
+         {
+            return (String)proxy.invokeOperation("listSessionsAsJSON", connectionID);
+         }
+
+         public String listPreparedTransactionDetailsAsJSON() throws Exception
+         {
+            return (String)proxy.invokeOperation("listPreparedTransactionDetailsAsJSON");
+         }
+
+         public String listPreparedTransactionDetailsAsHTML() throws Exception
+         {
+            return (String)proxy.invokeOperation("listPreparedTransactionDetailsAsHTML");
+         }
+
+         public void createConnectionFactory(String name,
+                                             boolean ha,
+                                             boolean useDiscovery,
+                                             int cfType,
+                                             String[] connectorNames,
+                                             Object[] bindings) throws Exception
+         {
+            proxy.invokeOperation("createConnectionFactory", name, ha, useDiscovery, cfType, connectorNames, bindings);
+            
+         }
+
+         public void createConnectionFactory(String name, boolean ha, boolean useDiscovery, int cfType, String connectors, String jndiBindings) throws Exception
+         {
+            proxy.invokeOperation("createConnectionFactory", name, ha, useDiscovery, cfType, connectors, jndiBindings);
+         }
+
+         public String listAllConsumersAsJSON() throws Exception
+         {
+            return (String)proxy.invokeOperation("listAllConsumersAsJSON");
+         }
+
 
       };
    }

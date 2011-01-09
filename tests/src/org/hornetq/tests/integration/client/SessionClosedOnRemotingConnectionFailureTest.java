@@ -112,14 +112,14 @@ public class SessionClosedOnRemotingConnectionFailureTest extends UnitTestCase
    {
       super.setUp();
 
-      Configuration config = new ConfigurationImpl();
+      Configuration config = createDefaultConfig();
       config.getAcceptorConfigurations().add(new TransportConfiguration(InVMAcceptorFactory.class.getCanonicalName()));
       config.setSecurityEnabled(false);
       server = HornetQServers.newHornetQServer(config, false);
 
       server.start();
-
-      sf = HornetQClient.createClientSessionFactory(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(UnitTestCase.INVM_CONNECTOR_FACTORY));
+      sf = locator.createSessionFactory();
    }
 
    @Override

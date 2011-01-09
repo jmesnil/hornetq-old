@@ -31,12 +31,7 @@ import org.hornetq.api.core.HornetQBuffers;
 import org.hornetq.api.core.HornetQException;
 import org.hornetq.api.core.Message;
 import org.hornetq.api.core.SimpleString;
-import org.hornetq.api.core.client.ClientConsumer;
-import org.hornetq.api.core.client.ClientMessage;
-import org.hornetq.api.core.client.ClientProducer;
-import org.hornetq.api.core.client.ClientSession;
-import org.hornetq.api.core.client.ClientSessionFactory;
-import org.hornetq.api.core.client.MessageHandler;
+import org.hornetq.api.core.client.*;
 import org.hornetq.core.logging.Logger;
 import org.hornetq.core.server.HornetQServer;
 import org.hornetq.core.server.Queue;
@@ -147,22 +142,25 @@ public abstract class LargeMessageTestBase extends ServiceTestBase
       server = createServer(realFiles);
       server.start();
 
+      ServerLocator locator = createInVMNonHALocator();
       try
       {
-         ClientSessionFactory sf = createInVMFactory();
 
          if (sendingBlocking)
-         {            sf.setBlockOnNonDurableSend(true);
-            sf.setBlockOnDurableSend(true);
-            sf.setBlockOnAcknowledge(true);
+         {            
+            locator.setBlockOnNonDurableSend(true);
+            locator.setBlockOnDurableSend(true);
+            locator.setBlockOnAcknowledge(true);
          }
 
          if (producerWindow > 0)
          {
-            sf.setConfirmationWindowSize(producerWindow);
+            locator.setConfirmationWindowSize(producerWindow);
          }
 
-         sf.setMinLargeMessageSize(minSize);
+         locator.setMinLargeMessageSize(minSize);
+         
+         ClientSessionFactory sf = locator.createSessionFactory();
 
          ClientSession session;
 
@@ -194,6 +192,7 @@ public abstract class LargeMessageTestBase extends ServiceTestBase
                {
                   server.stop();
                   server.start();
+                  sf = locator.createSessionFactory();
                }
 
                session = sf.createSession(null, null, isXA, false, false, preAck, 0);
@@ -228,6 +227,8 @@ public abstract class LargeMessageTestBase extends ServiceTestBase
             {
                server.stop();
                server.start();
+               //we need to recreate sf's
+               sf = locator.createSessionFactory();
             }
 
             session = sf.createSession(null, null, isXA, false, false, preAck, 0);
@@ -256,7 +257,7 @@ public abstract class LargeMessageTestBase extends ServiceTestBase
             server = createServer(realFiles);
             server.start();
 
-            sf = createInVMFactory();
+            sf = locator.createSessionFactory();
          }
 
          session = sf.createSession(null, null, isXA, false, false, preAck, 0);
@@ -431,9 +432,6 @@ public abstract class LargeMessageTestBase extends ServiceTestBase
                                          ((Integer)message.getObjectProperty(new SimpleString("counter-message"))).intValue());
                   }
 
-                  HornetQBuffer buffer = message.getBodyBuffer();
-                  buffer.resetReaderIndex();
-
                   if (useStreamOnConsume)
                   {
                      final AtomicLong bytesRead = new AtomicLong(0);
@@ -476,6 +474,9 @@ public abstract class LargeMessageTestBase extends ServiceTestBase
                   }
                   else
                   {
+                     HornetQBuffer buffer = message.getBodyBuffer();
+                     buffer.resetReaderIndex();
+
                      for (long b = 0; b < numberOfBytes; b++)
                      {
                         if (b % (1024l * 1024l) == 0l)
@@ -531,6 +532,7 @@ public abstract class LargeMessageTestBase extends ServiceTestBase
       }
       finally
       {
+         locator.close();
          try
          {
             server.stop();
@@ -613,6 +615,13 @@ public abstract class LargeMessageTestBase extends ServiceTestBase
    protected ClientMessage createLargeClientMessage(final ClientSession session, final int numberOfBytes) throws Exception
    {
       return createLargeClientMessage(session, numberOfBytes, true);
+   }
+
+   protected ClientMessage createLargeClientMessage (final ClientSession session, final byte[] buffer, final boolean durable) throws Exception
+   {
+      ClientMessage msgs = session.createMessage(durable);
+      msgs.getBodyBuffer().writeBytes(buffer);
+      return msgs;
    }
 
    protected ClientMessage createLargeClientMessage(final ClientSession session,

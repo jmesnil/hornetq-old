@@ -137,7 +137,7 @@ public class NettyAcceptor implements Acceptor
 
    private final HttpKeepAliveRunnable httpKeepAliveRunnable;
 
-   private final ConcurrentMap<Object, Connection> connections = new ConcurrentHashMap<Object, Connection>();
+   private final ConcurrentMap<Object, NettyConnection> connections = new ConcurrentHashMap<Object, NettyConnection>();
 
    private final Executor threadPool;
 
@@ -347,6 +347,8 @@ public class NettyAcceptor implements Acceptor
             if (httpEnabled)
             {
                handlers.put("http-decoder", new HttpRequestDecoder());
+               
+               handlers.put("http-aggregator", new HttpChunkAggregator(Integer.MAX_VALUE));
 
                handlers.put("http-encoder", new HttpResponseEncoder());
 
@@ -654,7 +656,7 @@ public class NettyAcceptor implements Acceptor
    {
       public void connectionCreated(final Connection connection, final ProtocolType protocol)
       {
-         if (connections.putIfAbsent(connection.getID(), connection) != null)
+         if (connections.putIfAbsent(connection.getID(), (NettyConnection)connection) != null)
          {
             throw new IllegalArgumentException("Connection already exists with id " + connection.getID());
          }
@@ -683,6 +685,16 @@ public class NettyAcceptor implements Acceptor
          }.start();
 
       }
+
+      public void connectionReadyForWrites(final Object connectionID, boolean ready)
+      {
+         NettyConnection conn = connections.get(connectionID);
+         
+         if (conn != null)
+         {
+            conn.fireReady(ready);
+         }         
+      }            
    }
 
    private class BatchFlusher implements Runnable
