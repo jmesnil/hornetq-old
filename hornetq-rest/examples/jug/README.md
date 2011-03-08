@@ -1,11 +1,11 @@
 ### Build HornetQ
 * cd ~/Git/hornetq
-* git co judcon
+* git co jug
 * ./build.sh jar
 * ./build.sh -f build-maven.xml install
 
 ## Run the demo
-* cd hornetq-rest/examples/judcon
+* cd hornetq-rest/examples/jug
 * mvn jetty:run
 
 # Run the JMS application
