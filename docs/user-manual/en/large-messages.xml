@@ -16,6 +16,10 @@
 <!-- and agrees not to assert, Section 4d of CC-BY-SA to the fullest extent        -->
 <!-- permitted by applicable law.                                                  -->
 <!-- ============================================================================= -->
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+<!ENTITY % BOOK_ENTITIES SYSTEM "HornetQ_User_Manual.ent">
+%BOOK_ENTITIES;
+]>
 <chapter id="large-messages">
     <title>Large Messages</title>
     <para>HornetQ supports sending and receiving of huge messages, even when the client and server
@@ -46,7 +50,7 @@
 
 ...
 
-&lt;large-message-directory>/data/large-messages&lt;/large-message-directory>
+&lt;large-messages-directory>/data/large-messages&lt;/large-messages-directory>
 
 ...
 
@@ -56,7 +60,7 @@
             different physical volume to the message journal or paging directory.</para>
     </section>
     <section>
-        <title>Setting the limits</title>
+        <title>Configuring Parameters</title>
         <para>Any message larger than a certain size is considered a large message. Large messages
             will be split up and sent in fragments. This is determined by the parameter <literal
                 >min-large-message-size</literal></para>
@@ -65,10 +69,13 @@
             <title>Using Core API</title>
             <para>If the HornetQ Core API is used, the minimal large message size is specified by
                     <literal>ClientSessionFactory.setMinLargeMessageSize</literal>.</para>
-            <programlisting>ClientSessionFactory factory = 
-            HornetQClient.createClientSessionFactory(new 
-            TransportConfiguration(NettyConnectorFactory.class.getName()), null);
-factory.setMinLargeMessageSize(25 * 1024);</programlisting>
+            <programlisting>
+ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(NettyConnectorFactory.class.getName()))
+
+locator.setMinLargeMessageSize(25 * 1024);
+
+ClientSessionFactory factory = HornetQClient.createClientSessionFactory();
+            </programlisting>
             <para><xref linkend="configuring-transports.client.side"/> will provide more information
                 on how to instantiate the session factory.</para>
         </section>
@@ -92,6 +99,14 @@ factory.setMinLargeMessageSize(25 * 1024);</programlisting>
             <para>If the connection factory is being instantiated directly, the minimum large
                 message size is specified by <literal
                     >HornetQConnectionFactory.setMinLargeMessageSize</literal>.</para>
+        </section>
+        <section>
+            <title>Compressed Large Messages</title>
+            <para>If you specify the boolean property <literal>compress-large-message</literal> on
+                the <literal>server locator</literal> or <literal>ConnectionFactory</literal> The
+                system will use the ZIP algorithm to compress the message body as the message is
+                transfered to the server's side. Notice that there's no special treatment at the
+                server's side, all the compressing and uncompressing is done at the client.</para>
         </section>
     </section>
     <section>
@@ -176,6 +191,9 @@ ClientMessage msg = session.createMessage();
 msg.setInputStream(dataInputStream);
 ...
             </programlisting>
+            <para>Notice also that for messages with more than 2GiB the getBodySize() will return
+                invalid values since this is an integer (which is also exposed to the JMS API). On
+                those cases you can use the message property _HQ_LARGE_SIZE.</para>
         </section>
         <section id="large-messages.streaming.over.jms">
             <title>Streaming over JMS</title>
@@ -246,20 +264,6 @@ for (int i = 0; i &lt; rm.getBodyLength(); i += 1024)
    int numberOfBytes = rm.readBytes(data);
    // Do whatever you want with the data
 }        </programlisting>
-    </section>
-    <section id="large-messages.cache.client">
-        <title>Cache Large Messages on client</title>
-        <para>Large messages are transferred by streaming from server to client. The message is
-            broken into smaller packets and as the message is read more packets will be received.
-            Because of that the body of the large message can be read only once, and by consequence
-            a received message can be sent to another producer only once. The JMS Bridge for
-            instance won't be able to resend a large message in case of failure</para>
-        <para>To solve this problem, you can enable the property <literal
-                >cache-large-message-client</literal> on the connection factory. If you enable this
-            property the client consumer will create a temporary file to hold the large message
-            content, so it would be possible to resend large messages.</para>
-        <note>Use this option on the connection factory used by the JMS Bridge if the JMS Bridge is
-            being used for large messages.</note>
     </section>
     <section id="large-messages.example">
         <title>Large message example</title>

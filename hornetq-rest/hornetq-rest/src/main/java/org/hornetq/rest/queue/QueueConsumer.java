@@ -5,6 +5,7 @@ import org.hornetq.api.core.client.ClientConsumer;
 import org.hornetq.api.core.client.ClientMessage;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.api.core.client.ClientSessionFactory;
+import org.hornetq.jms.client.SelectorTranslator;
 import org.hornetq.rest.util.Constants;
 import org.hornetq.rest.util.LinkStrategy;
 
@@ -37,6 +38,7 @@ public class QueueConsumer
    protected long lastPing = System.currentTimeMillis();
    protected DestinationServiceManager serviceManager;
    protected boolean autoAck = true;
+   protected String selector;
 
    /**
     * token used to create consume-next links
@@ -70,14 +72,15 @@ public class QueueConsumer
       lastPing = System.currentTimeMillis();
    }
 
-   public QueueConsumer(ClientSessionFactory factory, String destination, String id, DestinationServiceManager serviceManager) throws HornetQException
+   public QueueConsumer(ClientSessionFactory factory, String destination, String id, DestinationServiceManager serviceManager, String selector) throws HornetQException
    {
       this.factory = factory;
       this.destination = destination;
       this.id = id;
       this.serviceManager = serviceManager;
+      this.selector = selector;
 
-      createSession(factory, destination);
+      createSession();
    }
 
    public String getId()
@@ -136,12 +139,6 @@ public class QueueConsumer
       return checkIndexAndPoll(wait, info, info.getMatchedURIs().get(1), index);
    }
 
-   public synchronized Response runPoll(long wait, UriInfo info, String basePath)
-   {
-      ping();
-      return pollWithIndex(wait, info, basePath, -1);
-   }
-
    protected Response checkIndexAndPoll(long wait, UriInfo info, String basePath, long index)
    {
       ping();
@@ -164,7 +161,14 @@ public class QueueConsumer
       }
 
 
-      return pollWithIndex(wait, info, basePath, index);
+      try
+      {
+         return pollWithIndex(wait, info, basePath, index);
+      }
+      finally
+      {
+         ping(); // ping again as we don't want wait time included in timeout.
+      }
    }
 
    protected Response pollWithIndex(long wait, UriInfo info, String basePath, long index)
@@ -191,11 +195,18 @@ public class QueueConsumer
       }
    }
 
-   protected void createSession(ClientSessionFactory factory, String destination)
+   protected void createSession()
            throws HornetQException
    {
-      session = factory.createSession(true, true);
-      consumer = session.createConsumer(destination);
+      session = factory.createSession(true, true, 0);
+      if (selector == null)
+      {
+         consumer = session.createConsumer(destination);
+      }
+      else
+      {
+         consumer = session.createConsumer(destination, SelectorTranslator.convertToHornetQFilterString(selector));
+      }
       session.start();
    }
 

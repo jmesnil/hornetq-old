@@ -1,9 +1,18 @@
 package org.hornetq.rest;
 
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import javax.xml.bind.JAXBContext;
+
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientSessionFactory;
-import org.hornetq.core.client.impl.ClientSessionFactoryImpl;
-import org.hornetq.core.registry.JndiBindingRegistry;
+import org.hornetq.api.core.client.ServerLocator;
+import org.hornetq.core.client.impl.ServerLocatorImpl;
 import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
 import org.hornetq.core.remoting.impl.invm.TransportConstants;
 import org.hornetq.rest.queue.DestinationSettings;
@@ -14,14 +23,6 @@ import org.hornetq.rest.util.LinkHeaderLinkStrategy;
 import org.hornetq.rest.util.LinkStrategy;
 import org.hornetq.rest.util.TimeoutTask;
 import org.hornetq.spi.core.naming.BindingRegistry;
-
-import javax.xml.bind.JAXBContext;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.net.URL;
-import java.util.HashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -140,13 +141,20 @@ public class MessageServiceManager
 
       HashMap<String, Object> transportConfig = new HashMap<String, Object>();
       transportConfig.put(TransportConstants.SERVER_ID_PROP_NAME, configuration.getInVmId());
-      ClientSessionFactory consumerSessionFactory = new ClientSessionFactoryImpl(new TransportConfiguration(InVMConnectorFactory.class.getName(), transportConfig));
+
+
+      ServerLocator consumerLocator = new ServerLocatorImpl(false, new TransportConfiguration(InVMConnectorFactory.class.getName(), transportConfig));
+
       if (configuration.getConsumerWindowSize() != -1)
       {
-         consumerSessionFactory.setConsumerWindowSize(configuration.getConsumerWindowSize());
+    	  consumerLocator.setConsumerWindowSize(configuration.getConsumerWindowSize());
       }
 
-      ClientSessionFactory sessionFactory = new ClientSessionFactoryImpl(new TransportConfiguration(InVMConnectorFactory.class.getName(), transportConfig));
+      ClientSessionFactory consumerSessionFactory = consumerLocator.createSessionFactory();
+
+      ServerLocator defaultLocator =  new ServerLocatorImpl(false, new TransportConfiguration(InVMConnectorFactory.class.getName(), transportConfig));
+
+      ClientSessionFactory sessionFactory = defaultLocator.createSessionFactory();
 
       LinkStrategy linkStrategy = new LinkHeaderLinkStrategy();
       if (configuration.isUseLinkHeaders())
@@ -158,21 +166,27 @@ public class MessageServiceManager
          linkStrategy = new CustomHeaderLinkStrategy();
       }
 
+      queueManager.setServerLocator(defaultLocator);
       queueManager.setSessionFactory(sessionFactory);
       queueManager.setTimeoutTask(timeoutTask);
+      queueManager.setConsumerServerLocator(consumerLocator);
       queueManager.setConsumerSessionFactory(consumerSessionFactory);
       queueManager.setDefaultSettings(defaultSettings);
       queueManager.setPushStoreFile(configuration.getQueuePushStoreDirectory());
       queueManager.setProducerPoolSize(configuration.getProducerSessionPoolSize());
+      queueManager.setProducerTimeToLive(configuration.getProducerTimeToLive());
       queueManager.setLinkStrategy(linkStrategy);
       queueManager.setRegistry(registry);
 
+      topicManager.setServerLocator(defaultLocator);
       topicManager.setSessionFactory(sessionFactory);
       topicManager.setTimeoutTask(timeoutTask);
+      topicManager.setConsumerServerLocator(consumerLocator);
       topicManager.setConsumerSessionFactory(consumerSessionFactory);
       topicManager.setDefaultSettings(defaultSettings);
       topicManager.setPushStoreFile(configuration.getTopicPushStoreDirectory());
       topicManager.setProducerPoolSize(configuration.getProducerSessionPoolSize());
+      queueManager.setProducerTimeToLive(configuration.getProducerTimeToLive());
       topicManager.setLinkStrategy(linkStrategy);
       topicManager.setRegistry(registry);
 

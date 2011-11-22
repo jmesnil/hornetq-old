@@ -2,7 +2,8 @@ package org.hornetq.rest.queue;
 
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.api.core.client.ClientSessionFactory;
-import org.hornetq.core.client.impl.ClientSessionFactoryImpl;
+import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.core.remoting.impl.invm.InVMConnectorFactory;
 import org.hornetq.rest.util.LinkStrategy;
 import org.hornetq.rest.util.TimeoutTask;
@@ -14,13 +15,16 @@ import org.hornetq.spi.core.naming.BindingRegistry;
  */
 public abstract class DestinationServiceManager
 {
+   protected ServerLocator locator;
    protected ClientSessionFactory sessionFactory;
+   protected ServerLocator consumerServerLocator;
    protected ClientSessionFactory consumerSessionFactory;
    protected boolean started;
    protected String pushStoreFile;
    protected DestinationSettings defaultSettings = DestinationSettings.defaultSettings;
    protected TimeoutTask timeoutTask;
    protected int producerPoolSize;
+   protected long producerTimeToLive;
    protected LinkStrategy linkStrategy;
    protected BindingRegistry registry;
 
@@ -44,6 +48,15 @@ public abstract class DestinationServiceManager
       this.linkStrategy = linkStrategy;
    }
 
+   public long getProducerTimeToLive()
+   {
+      return producerTimeToLive;
+   }
+
+   public void setProducerTimeToLive(long producerTimeToLive)
+   {
+      this.producerTimeToLive = producerTimeToLive;
+   }
 
    public int getProducerPoolSize()
    {
@@ -64,8 +77,22 @@ public abstract class DestinationServiceManager
    {
       this.consumerSessionFactory = consumerSessionFactory;
    }
-
-   public TimeoutTask getTimeoutTask()
+   
+    /**
+	 * @return the consumerServerLocator
+	 */
+	public ServerLocator getConsumerServerLocator() {
+		return consumerServerLocator;
+	}
+	
+	/**
+	 * @param consumerServerLocator the consumerServerLocator to set
+	 */
+	public void setConsumerServerLocator(ServerLocator consumerServerLocator) {
+		this.consumerServerLocator = consumerServerLocator;
+	}
+	
+	public TimeoutTask getTimeoutTask()
    {
       return timeoutTask;
    }
@@ -83,6 +110,16 @@ public abstract class DestinationServiceManager
    public void setDefaultSettings(DestinationSettings defaultSettings)
    {
       this.defaultSettings = defaultSettings;
+   }
+   
+   public ServerLocator getServerLocator()
+   {
+	   return this.locator;
+   }
+   
+   public void setServerLocator(ServerLocator locator)
+   {
+	   this.locator = locator;
    }
 
    public ClientSessionFactory getSessionFactory()
@@ -107,8 +144,22 @@ public abstract class DestinationServiceManager
 
    protected void initDefaults()
    {
+	  if (locator == null)
+	  {
+		  locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+	  }
       if (sessionFactory == null)
-         sessionFactory = new ClientSessionFactoryImpl(new TransportConfiguration(InVMConnectorFactory.class.getName()));
+      {
+    	 try
+    	 {
+    		 sessionFactory = locator.createSessionFactory();
+    	 }
+    	 catch (Exception e)
+    	 {
+    		 throw new RuntimeException (e.getMessage(), e);
+    	 }
+      }
+      
       if (consumerSessionFactory == null) consumerSessionFactory = sessionFactory;
 
       if (timeoutTask == null) throw new RuntimeException("TimeoutTask is not set");

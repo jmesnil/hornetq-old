@@ -24,7 +24,6 @@ import java.util.logging.Logger;
 
 import org.hornetq.api.core.Message;
 import org.hornetq.api.core.TransportConfiguration;
-import org.hornetq.api.core.client.*;
 import org.hornetq.core.remoting.impl.netty.NettyConnectorFactory;
 import org.hornetq.core.remoting.impl.netty.TransportConstants;
 import org.hornetq.utils.TokenBucketLimiter;
@@ -195,16 +194,17 @@ public abstract class PerfBase
       params.put(TransportConstants.HOST_PROP_NAME, perfParams.getHost());
       params.put(TransportConstants.PORT_PROP_NAME, perfParams.getPort());
 
-      factory = HornetQClient.createClientSessionFactory(new TransportConfiguration(NettyConnectorFactory.class.getName(), params));
-      factory.setPreAcknowledge(perfParams.isPreAck());
-      factory.setConfirmationWindowSize(perfParams.getConfirmationWindow());
-      factory.setProducerWindowSize(perfParams.getProducerWindow());
-      factory.setConsumerWindowSize(perfParams.getConsumerWindow());
+      ServerLocator serverLocator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(NettyConnectorFactory.class.getName(), params));
+      serverLocator.setPreAcknowledge(perfParams.isPreAck());
+      serverLocator.setConfirmationWindowSize(perfParams.getConfirmationWindow());
+      serverLocator.setProducerWindowSize(perfParams.getProducerWindow());
+      serverLocator.setConsumerWindowSize(perfParams.getConsumerWindow());
+      serverLocator.setAckBatchSize(perfParams.getBatchSize());
 
-      factory.setAckBatchSize(perfParams.getBatchSize());
+      serverLocator.setBlockOnAcknowledge(perfParams.isBlockOnACK());
+      serverLocator.setBlockOnDurableSend(perfParams.isBlockOnPersistent());
+      factory = serverLocator.createSessionFactory();
 
-      factory.setBlockOnAcknowledge(perfParams.isBlockOnACK());
-      factory.setBlockOnDurableSend(perfParams.isBlockOnPersistent());
    }
 
    private void displayAverage(final long numberOfMessages, final long start, final long end)
@@ -293,11 +293,11 @@ public abstract class PerfBase
       }
       finally
       {
-         if (session != null)
+         if (factory != null)
          {
             try
             {
-               session.close();
+               factory.close();
             }
             catch (Exception e)
             {

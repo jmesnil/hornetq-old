@@ -18,6 +18,11 @@
 <!-- permitted by applicable law.                                                  -->
 <!-- ============================================================================= -->
 
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+<!ENTITY % BOOK_ENTITIES SYSTEM "HornetQ_User_Manual.ent">
+%BOOK_ENTITIES;
+]>
+
 <chapter id="duplicate-detection">
     <title>Duplicate Message Detection</title>
     <para>HornetQ includes powerful automatic duplicate message detection, filtering out
@@ -142,13 +147,5 @@ message.setStringProperty(HDR_DUPLICATE_DETECTION_ID.toString(), myUniqueID);
         <para>The default value for this parameter is <literal>true</literal>.</para>
         <para>For more information on cluster connections and how to configure them, please see <xref
                 linkend="clusters"/>.</para>
-    </section>
-    <section>
-        <title>Duplicate Detection and Paging</title>
-        <para>HornetQ also uses duplicate detection when paging messages to storage. This is
-            so when a message is depaged from storage and server failure occurs, we do not end up
-            depaging the message more than once which could result in duplicate delivery.</para>
-        <para>For more information on paging and how to configure it, please see <xref
-                linkend="paging" />.</para>
     </section>
 </chapter>

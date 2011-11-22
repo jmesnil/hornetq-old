@@ -16,12 +16,17 @@
 <!-- and agrees not to assert, Section 4d of CC-BY-SA to the fullest extent        -->
 <!-- permitted by applicable law.                                                  -->
 <!-- ============================================================================= -->
+
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+<!ENTITY % BOOK_ENTITIES SYSTEM "HornetQ_User_Manual.ent">
+%BOOK_ENTITIES;
+]>
 <chapter id="interoperability">
     <title>Interoperability</title>
     <section id="stomp">
         <title>Stomp</title>
         <para><ulink url="http://stomp.codehaus.org/">Stomp</ulink> is a text-orientated wire protocol that allows
-            Stomp clients to communicate with Stomp Brokers.</para>
+            Stomp clients to communicate with Stomp Brokers. HornetQ now supports both Stomp 1.0 and Stomp 1.1.</para>
         <para><ulink url="http://stomp.codehaus.org/Clients">Stomp clients</ulink> are available for
         several languages and platforms making it a good choice for interoperability.</para>
         <section id="stomp.native">
@@ -30,11 +35,11 @@
             you must configure a <literal>NettyAcceptor</literal> with a <literal>protocol</literal>
             parameter set to <literal>stomp</literal>:</para>
 <programlisting>
-	&lt;acceptor name="stomp-acceptor">
-		&lt;factory-class>org.hornetq.core.remoting.impl.netty.NettyAcceptorFactory&lt;/factory-class>
-		&lt;param key="protocol"  value="stomp"/>
-		&lt;param key="port"  value="61613"/>
-	&lt;/acceptor>
+&lt;acceptor name="stomp-acceptor">
+   &lt;factory-class>org.hornetq.core.remoting.impl.netty.NettyAcceptorFactory&lt;/factory-class>
+   &lt;param key="protocol"  value="stomp"/>
+   &lt;param key="port"  value="61613"/>
+&lt;/acceptor>
 </programlisting>
           <para>With this configuration, HornetQ will accept Stomp connections on 
             the port <literal>61613</literal> (which is the default port of the Stomp brokers).</para>
@@ -43,6 +48,21 @@
             <title>Limitations</title>
             <para>Message acknowledgements are not transactional. The ACK frame can not be part of a transaction
               (it will be ignored if its <literal>transaction</literal> header is set).</para>
+          </section>
+          <section>
+            <title>Stomp 1.1 Notes</title>
+            <section>
+				<title>Virtual Hosting</title>
+                <para>HornetQ currently doesn't support virtual hosting, which means the 'host' header 
+                in CONNECT fram will be ignored.</para>
+            </section>
+            <section>
+				<title>Heart-beating</title>
+                <para>HornetQ specifies a minimum value for both client and server heart-beat intervals. 
+                The minimum interval for both client and server heartbeats is 500 milliseconds. That means if 
+                a client sends a CONNECT frame with heartbeat values lower than 500, the server will defaults 
+                the value to 500 milliseconds regardless the values of the 'heart-beat' header in the frame.</para>
+            </section>
           </section>
         </section>
 
@@ -57,6 +77,18 @@
             When a Stomp client subscribes (or unsubscribes) for a destination (using a <literal>SUBSCRIBE</literal>
             or <literal>UNSUBSCRIBE</literal> frame), the destination is mapped to a HornetQ queue.</para>
         </section>
+      <section>
+        <title>STOMP and connection-ttl</title>
+        <para>Well behaved STOMP clients will always send a DISCONNECT frame before closing their connections. In this case the server
+          will clear up any server side resources such as sessions and consumers synchronously. However if STOMP clients exit without
+        sending a DISCONNECT frame or if they crash the server will have no way of knowing immediately whether the client is still alive
+        or not. STOMP connections therefore default to a connection-ttl value of 1 minute (see chapter on <link linkend="connection-ttl"
+          >connection-ttl</link> for more information. This value can be overridden using connection-ttl-override.
+        </para>
+        <note><para>Please note that the STOMP protocol does not contain any heartbeat frame. It is therefore the user's responsibility to make sure
+        data is sent within connection-ttl or the server will assume the client is dead and clean up server side resources.</para></note>
+      </section>
+      
         <section>
           <title>Stomp and JMS interoperabilty</title>
           <section>

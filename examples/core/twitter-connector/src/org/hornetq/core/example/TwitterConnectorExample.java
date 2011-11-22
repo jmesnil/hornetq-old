@@ -19,6 +19,7 @@ import org.hornetq.api.core.client.ClientProducer;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.api.core.client.HornetQClient;
+import org.hornetq.api.core.client.ServerLocator;
 import org.hornetq.common.example.HornetQExample;
 import org.hornetq.core.remoting.impl.netty.NettyConnectorFactory;
 
@@ -40,12 +41,22 @@ public class TwitterConnectorExample extends HornetQExample
    @Override
    public boolean runExample() throws Exception
    {
+      ServerLocator locator = null;
       ClientSessionFactory csf = null;
       ClientSession session = null;
       try
       {
-         // Step 1. Create a ClientSessionFactory.
-         csf = HornetQClient.createClientSessionFactory (new TransportConfiguration(NettyConnectorFactory.class.getName()));
+         String testMessage = System.currentTimeMillis() + ": " + System.getProperty("twitter.example.alternativeMessage");
+         if(testMessage == null || testMessage.trim().equals("")) {
+            testMessage = System.currentTimeMillis() + ": ### Hello, HornetQ fans!! We are now experiencing so fast, so reliable and so exciting messaging never seen before ;-) ###";
+         }
+
+         // Step 1. Create a ClientSessionFactory
+         
+         
+         locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(NettyConnectorFactory.class.getName()));
+         
+         csf = locator.createSessionFactory();
 
          // Step 2. Create a core session.
          session = csf.createSession(true,true);
@@ -58,7 +69,6 @@ public class TwitterConnectorExample extends HornetQExample
 
          // Step 5. Create a core message.
          ClientMessage cm = session.createMessage(org.hornetq.api.core.Message.TEXT_TYPE,true);
-         String testMessage = System.currentTimeMillis() + ": ### Hello, HornetQ fans!! We are now experiencing so fast, so reliable and so exciting messaging never seen before ;-) ###";
          cm.getBodyBuffer().writeString(testMessage);
 
          // Step 6. Send a message to queue.outgoingQueue.
@@ -76,13 +86,21 @@ public class TwitterConnectorExample extends HornetQExample
          ClientMessage received = cc.receive(70 * 1000);
          received.acknowledge();
          String receivedText = received.getBodyBuffer().readString();
-         System.out.println("#### Received a message from " + INCOMING_QUEUE + ": " + receivedText);
 
-         if(!receivedText.equals(testMessage))
+         while(!receivedText.equals(testMessage))
          {
-            return false;
+            // ignoring other tweets
+            received = cc.receiveImmediate();
+            if(received == null) {
+               // no other tweets. test message has gone...
+               return false;
+            }
+            
+            received.acknowledge();
+            receivedText = received.getBodyBuffer().readString();
          }
-         
+
+         System.out.println("#### Received a message from " + INCOMING_QUEUE + ": " + receivedText);
          return true;
       }
       finally
@@ -95,6 +113,11 @@ public class TwitterConnectorExample extends HornetQExample
          if(csf != null)
          {
             csf.close();
+         }
+         
+         if (locator != null)
+         {
+            locator.close();
          }
       }
    }

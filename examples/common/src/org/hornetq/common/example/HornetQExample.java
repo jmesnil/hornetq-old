@@ -12,11 +12,16 @@
  */
 package org.hornetq.common.example;
 
+import org.hornetq.api.core.TransportConfiguration;
+import org.hornetq.core.client.impl.DelegatingSession;
+import org.hornetq.jms.client.HornetQConnection;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.Properties;
 import java.util.logging.Logger;
 
+import javax.jms.Connection;
 import javax.naming.InitialContext;
 
 /**
@@ -106,6 +111,9 @@ public abstract class HornetQExample
       File file = new File("server" + id + "/KILL_ME");
 
       file.createNewFile();
+      
+      // Sleep longer than the KillChecker check period
+      Thread.sleep(3000);
    }
 
    protected void stopServer(final int id) throws Exception
@@ -141,6 +149,8 @@ public abstract class HornetQExample
    {
       String config = configs[index];
       HornetQExample.log.info("starting server with config '" + config + "' " + "logServerOutput " + logServerOutput);
+      String debugProp = System.getProperty("server" + index);
+      boolean debugServer= "true".equals(debugProp);
       servers[index] = SpawnedVMSupport.spawnVM(serverClasspath,
                                                 "HornetQServer_" + index,
                                                 SpawnedHornetQServer.class.getName(),
@@ -149,6 +159,27 @@ public abstract class HornetQExample
                                                 "STARTED::",
                                                 "FAILED::",
                                                 config,
+                                                debugServer,
+                                                "hornetq-beans.xml");
+   }
+
+   protected void reStartServer(final int index) throws Exception
+   {
+      String config = configs[index];
+      HornetQExample.log.info("starting server with config '" + config + "' " + "logServerOutput " + logServerOutput);
+      File f = new File(config + "/KILL_ME");
+      f.delete();
+      String debugProp = System.getProperty("server" + index);
+      boolean debugServer= "true".equals(debugProp);
+      servers[index] = SpawnedVMSupport.spawnVM(serverClasspath,
+                                                "HornetQServer_" + index,
+                                                SpawnedHornetQServer.class.getName(),
+                                                serverProps,
+                                                logServerOutput,
+                                                "STARTED::",
+                                                "FAILED::",
+                                                config,
+                                                debugServer,
                                                 "hornetq-beans.xml");
    }
 
@@ -188,6 +219,30 @@ public abstract class HornetQExample
       server.destroy();
    }
 
+
+   protected int getServer(Connection connection)
+   {
+      DelegatingSession session = (DelegatingSession) ((HornetQConnection) connection).getInitialSession();
+      TransportConfiguration transportConfiguration = session.getSessionFactory().getConnectorConfiguration();
+      String port = (String) transportConfiguration.getParams().get("port");
+      return Integer.valueOf(port) - 5445;
+   }
+
+   protected Connection getServerConnection(int server, Connection... connections)
+   {
+      for (Connection connection : connections)
+      {
+         DelegatingSession session = (DelegatingSession) ((HornetQConnection) connection).getInitialSession();
+         TransportConfiguration transportConfiguration = session.getSessionFactory().getConnectorConfiguration();
+         String port = (String) transportConfiguration.getParams().get("port");
+         if(Integer.valueOf(port) == server + 5445)
+         {
+            return connection;
+         }
+      }
+      return null;
+   }
+   
    private void reportResultAndExit()
    {
       if (failure)

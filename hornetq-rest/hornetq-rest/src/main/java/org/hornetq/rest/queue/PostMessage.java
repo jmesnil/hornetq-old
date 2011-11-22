@@ -7,6 +7,7 @@ import org.hornetq.api.core.client.ClientProducer;
 import org.hornetq.api.core.client.ClientSession;
 import org.hornetq.api.core.client.ClientSessionFactory;
 import org.hornetq.rest.util.HttpMessageHelper;
+import org.hornetq.api.core.Message;
 
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
@@ -36,19 +37,39 @@ public class PostMessage
    protected DestinationServiceManager serviceManager;
    private AtomicLong counter = new AtomicLong(1);
    private final String startupTime = Long.toString(System.currentTimeMillis());
+   protected long producerTimeToLive;
+
+   protected static class Pooled
+   {
+      public ClientSession session;
+      public ClientProducer producer;
+
+      private Pooled(ClientSession session, ClientProducer producer)
+      {
+         this.session = session;
+         this.producer = producer;
+      }
+   }
+
+   protected ArrayBlockingQueue<Pooled> pool;
+   protected int poolSize = 10;
 
    protected String generateDupId()
    {
       return startupTime + Long.toString(counter.incrementAndGet());
    }
 
-   public void publish(HttpHeaders headers, byte[] body, String dup, boolean durable) throws Exception
+   public void publish(HttpHeaders headers, byte[] body, String dup,
+                       boolean durable,
+                       Long ttl,
+                       Long expiration,
+                       Integer priority) throws Exception
    {
       Pooled pooled = getPooled();
       try
       {
          ClientProducer producer = pooled.producer;
-         ClientMessage message = createHornetQMessage(headers, body, durable, pooled.session);
+         ClientMessage message = createHornetQMessage(headers, body, durable, ttl, expiration, priority, pooled.session);
          message.putStringProperty(ClientMessage.HDR_DUPLICATE_DETECTION_ID.toString(), dup);
          producer.send(message);
          pool.add(pooled);
@@ -69,14 +90,22 @@ public class PostMessage
 
    @PUT
    @Path("{id}")
-   public Response putWithId(@PathParam("id") String dupId, @QueryParam("durable") Boolean durable, @Context HttpHeaders headers, @Context UriInfo uriInfo, byte[] body)
+   public Response putWithId(@PathParam("id") String dupId, @QueryParam("durable") Boolean durable,
+                             @QueryParam("ttl") Long ttl,
+                             @QueryParam("expiration") Long expiration,
+                             @QueryParam("priority") Integer priority,
+                             @Context HttpHeaders headers, @Context UriInfo uriInfo, byte[] body)
    {
-      return postWithId(dupId, durable, headers, uriInfo, body);
+      return postWithId(dupId, durable, ttl, expiration, priority, headers, uriInfo, body);
    }
 
    @POST
    @Path("{id}")
-   public Response postWithId(@PathParam("id") String dupId, @QueryParam("durable") Boolean durable, @Context HttpHeaders headers, @Context UriInfo uriInfo, byte[] body)
+   public Response postWithId(@PathParam("id") String dupId, @QueryParam("durable") Boolean durable,
+                              @QueryParam("ttl") Long ttl,
+                              @QueryParam("expiration") Long expiration,
+                              @QueryParam("priority") Integer priority,
+                              @Context HttpHeaders headers, @Context UriInfo uriInfo, byte[] body)
    {
       String matched = uriInfo.getMatchedURIs().get(1);
       UriBuilder nextBuilder = uriInfo.getBaseUriBuilder();
@@ -91,7 +120,7 @@ public class PostMessage
       }
       try
       {
-         publish(headers, body, dupId, isDurable);
+         publish(headers, body, dupId, isDurable, ttl, expiration, priority);
       }
       catch (Exception e)
       {
@@ -106,21 +135,15 @@ public class PostMessage
       return builder.build();
    }
 
-
-   protected static class Pooled
+   public long getProducerTimeToLive()
    {
-      public ClientSession session;
-      public ClientProducer producer;
-
-      private Pooled(ClientSession session, ClientProducer producer)
-      {
-         this.session = session;
-         this.producer = producer;
-      }
+      return producerTimeToLive;
    }
 
-   protected ArrayBlockingQueue<Pooled> pool;
-   protected int poolSize = 10;
+   public void setProducerTimeToLive(long producerTimeToLive)
+   {
+      this.producerTimeToLive = producerTimeToLive;
+   }
 
    public DestinationServiceManager getServiceManager()
    {
@@ -217,10 +240,16 @@ public class PostMessage
    }
 
 
-   protected ClientMessage createHornetQMessage(HttpHeaders headers, byte[] body, boolean durable, ClientSession session) throws Exception
+   protected ClientMessage createHornetQMessage(HttpHeaders headers, byte[] body,
+                                                boolean durable,
+                                                Long ttl,
+                                                Long expiration,
+                                                Integer priority,
+                                                ClientSession session) throws Exception
    {
       ClientMessage message = session.createMessage(Message.BYTES_TYPE, durable);
       HttpMessageHelper.writeHttpMessage(headers, body, message);
       return message;
    }
+
 }

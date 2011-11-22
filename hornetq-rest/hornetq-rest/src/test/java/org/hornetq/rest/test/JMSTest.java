@@ -1,16 +1,10 @@
 package org.hornetq.rest.test;
 
-import org.hornetq.jms.client.HornetQConnectionFactory;
-import org.hornetq.jms.client.HornetQDestination;
-import org.hornetq.rest.HttpHeaderProperty;
-import org.hornetq.rest.Jms;
-import org.hornetq.rest.queue.QueueDeployment;
-import org.jboss.resteasy.client.ClientRequest;
-import org.jboss.resteasy.client.ClientResponse;
-import org.jboss.resteasy.spi.Link;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.jboss.resteasy.test.TestPortProvider.generateURL;
+
+import java.io.Serializable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
@@ -22,11 +16,18 @@ import javax.jms.MessageProducer;
 import javax.jms.ObjectMessage;
 import javax.jms.Session;
 import javax.xml.bind.annotation.XmlRootElement;
-import java.io.Serializable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
-import static org.jboss.resteasy.test.TestPortProvider.*;
+import org.hornetq.jms.client.HornetQDestination;
+import org.hornetq.jms.client.HornetQJMSConnectionFactory;
+import org.hornetq.rest.HttpHeaderProperty;
+import org.hornetq.rest.Jms;
+import org.hornetq.rest.queue.QueueDeployment;
+import org.jboss.resteasy.client.ClientRequest;
+import org.jboss.resteasy.client.ClientResponse;
+import org.jboss.resteasy.spi.Link;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -39,12 +40,13 @@ public class JMSTest extends MessageTestBase
    @BeforeClass
    public static void setup() throws Exception
    {
-      connectionFactory = new HornetQConnectionFactory(manager.getQueueManager().getSessionFactory());
+      connectionFactory = new HornetQJMSConnectionFactory(manager.getQueueManager().getServerLocator());
    }
 
    @XmlRootElement
    public static class Order implements Serializable
    {
+      private static final long serialVersionUID = 1397854679589606480L;
       private String name;
       private String amount;
 
@@ -128,7 +130,6 @@ public class JMSTest extends MessageTestBase
       public static Order order;
       public static CountDownLatch latch = new CountDownLatch(1);
 
-      @Override
       public void onMessage(Message message)
       {
          try

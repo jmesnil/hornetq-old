@@ -49,9 +49,7 @@ public class LargeMessageExample extends HornetQExample
    // This may take some considerable time to create, send and consume - if it takes too long or you don't have
    // enough disk space just reduce the file size here
 
-   // private final long FILE_SIZE = 256L * 1024 * 1024;
-
-   private final long FILE_SIZE = 10L * 1024 * 1024 * 1024; // 10 GiB message
+  private final long FILE_SIZE = 2L * 1024 * 1024 * 1024; // 10 GiB message
 
    @Override
    public boolean runExample() throws Exception
@@ -152,7 +150,7 @@ public class LargeMessageExample extends HornetQExample
          // an empty body.
          BytesMessage messageReceived = (BytesMessage)messageConsumer.receive(120000);
 
-         System.out.println("Received message with: " + messageReceived.getBodyLength() +
+         System.out.println("Received message with: " + messageReceived.getLongProperty("_HQ_LARGE_SIZE") +
                             " bytes. Now streaming to file on disk.");
 
          // Step 13. We set an OutputStream on the message. This causes the message body to be written to the

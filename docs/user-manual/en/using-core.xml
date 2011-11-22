@@ -94,10 +94,10 @@
                 <para>In core, there is no concept of a Topic, Topic is a JMS only term. Instead, in
                     core, we just deal with <emphasis>addresses</emphasis> and
                         <emphasis>queues</emphasis>.</para>
-                <para>For example, a JMS topic would implemented by a single address to which many
-                    queues are bound. Each queue represents a subscription of the topic. A JMS Queue
-                    would be implemented as a single address to which one queue is bound - that
-                    queue represents the JMS queue.</para>
+                <para>For example, a JMS topic would be implemented by a single address to which
+                    many queues are bound. Each queue represents a subscription of the topic. A JMS
+                    Queue would be implemented as a single address to which one queue is bound -
+                    that queue represents the JMS queue.</para>
             </note>
         </section>
         <section>
@@ -115,13 +115,23 @@
                 a maximum of one address.</para>
         </section>
         <section>
+            <title>ServerLocator</title>
+            <para>Clients use <literal>ServerLocator</literal> instances to create <literal
+                    >ClientSessionFactory</literal> instances. <literal>ServerLocator</literal>
+                instances are used to locate servers and create connections to them. </para>
+            <para>In JMS terms think of a <literal>ServerLocator</literal> in the same way you would
+                a JMS Connection Factory</para>
+            <para><literal>ServerLocator</literal> instances are created using the <literal
+                    >HornetQClient</literal> factory class.</para>
+        </section>
+        <section>
             <title>ClientSessionFactory</title>
             <para>Clients use <literal>ClientSessionFactory</literal> instances to create <literal
                     >ClientSession</literal> instances. <literal>ClientSessionFactory</literal>
-                instances know how to connect to the server to create sessions, and are configurable
-                with many settings.</para>
+                instances are basically the connection to a server</para>
+            <para> In JMS terms think of them as JMS Connections</para>
             <para><literal>ClientSessionFactory</literal> instances are created using the <literal
-                    >HornetQClient</literal> factory class.</para>
+                    >ServerLocator</literal> class.</para>
         </section>
         <section>
             <title>ClientSession</title>
@@ -161,11 +171,11 @@
         </section>
         <warning>
             <para>Please note that ClientSession, ClientProducer and ClientConsumer instances are
-                <emphasis>designed to be re-used</emphasis>.</para>
-            <para>It's an anti-pattern to create new ClientSession, ClientProducer and ClientConsumer instances
-                for each message you produce or consume. If you do this, your application will
-                perform very poorly. This is discussed further in the section on performance tuning
-                <xref linkend="perf-tuning"/>.</para>
+                    <emphasis>designed to be re-used</emphasis>.</para>
+            <para>It's an anti-pattern to create new ClientSession, ClientProducer and
+                ClientConsumer instances for each message you produce or consume. If you do this,
+                your application will perform very poorly. This is discussed further in the section
+                on performance tuning <xref linkend="perf-tuning"/>.</para>
         </warning>
     </section>
     <section>
@@ -173,9 +183,10 @@
         <para>Here's a very simple program using the core messaging API to send and receive a
             message:</para>
         <programlisting>
-ClientSessionFactory factory =  HornetQClient.createClientSessionFactory(
-                                        new TransportConfiguration(
+ServerLocator locator = HornetQClient.createServerLocatorWithoutHA(new TransportConfiguration(
                                            InVMConnectorFactory.class.getName()));
+
+ClientSessionFactory factory =  locator.createClientSessionFactory();
 
 ClientSession session = factory.createSession();
 

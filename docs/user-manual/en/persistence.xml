@@ -16,6 +16,11 @@
 <!-- and agrees not to assert, Section 4d of CC-BY-SA to the fullest extent        -->
 <!-- permitted by applicable law.                                                  -->
 <!-- ============================================================================= -->
+
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+<!ENTITY % BOOK_ENTITIES SYSTEM "HornetQ_User_Manual.ent">
+%BOOK_ENTITIES;
+]>
 <chapter id="persistence">
     <title>Persistence</title>
     <para>In this chapter we will describe how persistence works with HornetQ and how to configure
@@ -39,7 +44,7 @@
         - the head does not have to move.</para>
     <para>As delete records are added to the journal, HornetQ has a sophisticated file garbage
         collection algorithm which can determine if a particular journal file is needed any more -
-        i.e. has all it's data been deleted in the same or other files. If so, the file can be
+        i.e. has all its data been deleted in the same or other files. If so, the file can be
         reclaimed and re-used. </para>
     <para>HornetQ also has a compaction algorithm which removes dead space from the journal and
         compresses up the data so it takes up less files on disk.</para>
